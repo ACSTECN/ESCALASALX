@@ -135,6 +135,7 @@ export const dbColetas = {
       .gte('data_coleta', startDate)
       .lte('data_coleta', endDate)
       .order('data_coleta', { ascending: true })
+      .order('turno', { ascending: true })
       .order('horario', { ascending: true }),
 
   listByDate: (date: string) =>
@@ -146,6 +147,7 @@ export const dbColetas = {
          agendamentos:agendamentos(*, condutor:condutores(*, rota_fixa:rotas_fixas(*)))`
       )
       .eq('data_coleta', date)
+      .order('turno')
       .order('horario'),
 
   get: (id: string) =>
@@ -167,14 +169,14 @@ export const dbColetas = {
 
   remove: (id: string) => alxDb.from('coletas').delete().eq('id', id),
 
-  // Remove coletas que correspondem a uma meta (mesmo hub, dia da semana e horário)
-  removeByMetaCriteria: async (hubId: string, diaSemana: number, horario: string) => {
-    // Busca as coletas do hub e horário que caem no dia da semana especificado
+  // Remove coletas que correspondem a uma meta (mesmo hub, dia da semana e turno)
+  removeByMetaCriteria: async (hubId: string, diaSemana: number, turno: number) => {
+    // Busca as coletas do hub e turno que caem no dia da semana especificado
     const { data: coletas } = await alxDb
       .from('coletas')
       .select('id, data_coleta')
       .eq('hub_id', hubId)
-      .eq('horario', horario);
+      .eq('turno', turno);
 
     if (!coletas || coletas.length === 0) return { error: null };
 
@@ -193,7 +195,7 @@ export const dbColetas = {
   removeByMetaCriteriaInRange: async (
     hubId: string,
     diaSemana: number,
-    horario: string,
+    turno: number,
     startDate: string,
     endDate: string
   ) => {
@@ -201,7 +203,7 @@ export const dbColetas = {
       .from('coletas')
       .select('id, data_coleta')
       .eq('hub_id', hubId)
-      .eq('horario', horario)
+      .eq('turno', turno)
       .gte('data_coleta', startDate)
       .lte('data_coleta', endDate);
 
@@ -222,7 +224,7 @@ export const dbColetas = {
   removeEmptyByMetaCriteriaInRange: async (
     hubId: string,
     diaSemana: number,
-    horario: string,
+    turno: number,
     startDate: string,
     endDate: string
   ) => {
@@ -230,7 +232,7 @@ export const dbColetas = {
       .from('coletas')
       .select('id, data_coleta, agendamentos:agendamentos(id)')
       .eq('hub_id', hubId)
-      .eq('horario', horario)
+      .eq('turno', turno)
       .gte('data_coleta', startDate)
       .lte('data_coleta', endDate);
 
@@ -259,6 +261,7 @@ export const dbMetas = {
       .from('metas_coletas')
       .select('*, hub:hubs(*, cidade:cidades(*))')
       .order('dia_semana')
+      .order('turno')
       .order('horario'),
   listByHub: (hubId: string) =>
     alxDb.from('metas_coletas').select('*').eq('hub_id', hubId),

@@ -62,7 +62,7 @@ export function CalendarioPage() {
       .channel('coletas_changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'coletas' },
+        { event: '*', schema: 'alx', table: 'coletas' },
         () => loadColetas()
       )
       .subscribe();

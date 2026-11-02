@@ -74,6 +74,7 @@ export interface Coleta {
   id: string;
   hub_id: string;
   data_coleta: string;
+  turno: number;
   horario: string;
   meta: number;
   status: StatusColeta;
@@ -94,6 +95,7 @@ export interface MetaColeta {
   id: string;
   hub_id: string;
   dia_semana: number;
+  turno: number;
   horario: string;
   meta: number;
   ativo: boolean;
@@ -224,6 +226,17 @@ export const DIAS_SEMANA = [
 ];
 
 export const DIAS_SEMANA_CURTO = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+export const TURNOS = [1, 2, 3];
+
+export const TURNO_LABELS: Record<number, string> = {
+  1: '1º turno',
+  2: '2º turno',
+  3: '3º turno',
+};
+
+export const turnoLabel = (turno: number | null | undefined) =>
+  TURNO_LABELS[turno || 1] || `${turno}º turno`;
 
 export const STATUS_AGENDAMENTO_LABELS: Record<StatusAgendamento, string> = {
   agendado: 'Agendado',

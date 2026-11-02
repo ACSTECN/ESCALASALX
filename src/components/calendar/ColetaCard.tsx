@@ -2,7 +2,7 @@ import type { Coleta } from '@/types';
 import { calcColetaStats } from '@/lib/db';
 import { formatTime, getOccupancyColor, colorClasses } from '@/utils';
 import type { ThresholdsOcupacao } from '@/types';
-import { STATUS_COLETA_LABELS } from '@/types';
+import { STATUS_COLETA_LABELS, turnoLabel } from '@/types';
 import { Clock, Users, CheckCircle2, CheckSquare, Square } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 
@@ -61,9 +61,12 @@ export function ColetaCard({ coleta, thresholds, onClick, selectable, selected, 
         </span>
       </div>
 
-      <div className="mb-2 flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+      <div className="mb-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
         <Clock size={12} />
         <span>{formatTime(coleta.horario)}</span>
+        <span className="px-1.5 py-0.5 rounded bg-slate-200/80 text-[10px] font-semibold text-slate-600 dark:bg-slate-700/70 dark:text-slate-300">
+          {turnoLabel(coleta.turno)}
+        </span>
       </div>
 
       <div className="flex items-baseline gap-1 mb-1">

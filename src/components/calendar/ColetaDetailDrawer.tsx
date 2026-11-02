@@ -3,7 +3,7 @@ import { X, Clock, Users, Target, Plus, Trash2, Pencil, Check, Upload, Download,
 import type { Coleta, Condutor, Agendamento, StatusAgendamento } from '@/types';
 import { calcColetaStats, dbAgendamentos, dbCondutores, dbColetas } from '@/lib/db';
 import { formatDateBR, formatTime, getOccupancyColor, colorClasses, toCSV, downloadFile } from '@/utils';
-import { STATUS_AGENDAMENTO_LABELS, STATUS_COLETA_LABELS } from '@/types';
+import { STATUS_AGENDAMENTO_LABELS, STATUS_COLETA_LABELS, turnoLabel } from '@/types';
 import { Badge } from '@/components/ui/Badge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Modal } from '@/components/ui/Modal';
@@ -574,6 +574,7 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated }: ColetaDetailD
       'Status': STATUS_AGENDAMENTO_LABELS[a.status],
       'HUB': coleta.hub?.sigla || '',
       'Data': formatDateBR(coleta.data_coleta),
+      'Turno': turnoLabel(coleta.turno),
       'Horário': formatTime(coleta.horario),
     }));
     const csv = toCSV(linhas);
@@ -611,7 +612,7 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated }: ColetaDetailD
           </div>
           <div className="flex flex-wrap items-center gap-4 mt-3 text-sm">
             <span className="flex items-center gap-1 text-slate-700">
-              <Clock size={14} /> {formatDateBR(coleta.data_coleta)} • {formatTime(coleta.horario)}
+              <Clock size={14} /> {formatDateBR(coleta.data_coleta)} • {formatTime(coleta.horario)} • {turnoLabel(coleta.turno)}
             </span>
             <Badge variant={coleta.status === 'finalizada' ? 'gray' : 'info'}>{STATUS_COLETA_LABELS[coleta.status]}</Badge>
           </div>

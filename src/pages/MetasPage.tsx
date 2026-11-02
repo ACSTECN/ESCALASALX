@@ -8,11 +8,18 @@ import { Badge } from '@/components/ui/Badge';
 import { dbMetas, dbHubs, dbCidades, dbHistorico, dbColetas } from '@/lib/db';
 import { toCSV, downloadFile } from '@/utils';
 import type { MetaColeta, Hub, Cidade, HistoricoAlteracao } from '@/types';
-import { DIAS_SEMANA } from '@/types';
+import { DIAS_SEMANA, TURNOS, turnoLabel } from '@/types';
 import { formatTime } from '@/utils';
 import { formatISO, startOfWeek, addDays } from 'date-fns';
 import { useAuthStore } from '@/store/auth';
 import { canManageGoals } from '@/store/auth';
+
+type TurnoForm = { turno: number; horario: string; meta: number; ativo: boolean };
+
+const HORARIOS_PADRAO = ['08:00', '14:00', '18:00'];
+
+const turnosPadrao = (): TurnoForm[] =>
+  TURNOS.map((turno, i) => ({ turno, horario: HORARIOS_PADRAO[i] || '08:00', meta: 20, ativo: true }));
 
 export function MetasPage() {
   const user = useAuthStore((s) => s.user);
@@ -30,12 +37,8 @@ export function MetasPage() {
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<MetaColeta | null>(null);
-  const [form, setForm] = useState({
-    hub_id: '',
-    horario: '14:00',
-    meta: 20,
-    ativo: true,
-  });
+  const [form, setForm] = useState({ hub_id: '' });
+  const [turnos, setTurnos] = useState<TurnoForm[]>(turnosPadrao());
   const [diasSelecionados, setDiasSelecionados] = useState<number[]>([1]);
   const [periodo, setPeriodo] = useState({
     data_inicio: formatISO(startOfWeek(new Date(), { weekStartsOn: 1 }), { representation: 'date' }),
@@ -70,13 +73,27 @@ export function MetasPage() {
   const openModal = (meta?: MetaColeta) => {
     setEditing(meta || null);
     if (meta) {
-      setForm({ hub_id: meta.hub_id, horario: meta.horario, meta: meta.meta, ativo: meta.ativo });
+      const doDia = metas.filter((m) => m.hub_id === meta.hub_id && m.dia_semana === meta.dia_semana);
+      setForm({ hub_id: meta.hub_id });
+      setTurnos(
+        TURNOS.map((turno, i) => {
+          const existente = doDia.find((m) => m.turno === turno);
+          return existente
+            ? { turno, horario: existente.horario, meta: existente.meta, ativo: existente.ativo }
+            : { turno, horario: HORARIOS_PADRAO[i] || '08:00', meta: 20, ativo: false };
+        })
+      );
       setDiasSelecionados([meta.dia_semana]);
     } else {
-      setForm({ hub_id: hubs[0]?.id || '', horario: '14:00', meta: 20, ativo: true });
+      setForm({ hub_id: hubs[0]?.id || '' });
+      setTurnos(turnosPadrao());
       setDiasSelecionados([1]);
     }
     setModalOpen(true);
+  };
+
+  const setTurno = (turno: number, patch: Partial<TurnoForm>) => {
+    setTurnos((prev) => prev.map((t) => (t.turno === turno ? { ...t, ...patch } : t)));
   };
 
   const save = async () => {
@@ -86,50 +103,44 @@ export function MetasPage() {
       return;
     }
 
-    if (editing) {
-      const diaSelecionado = diasSelecionados[0];
-      const metaConflitante = metas.find(
-        (m) => m.hub_id === form.hub_id && m.dia_semana === diaSelecionado && m.id !== editing.id
-      );
-
-      await dbColetas.removeEmptyByMetaCriteriaInRange(
-        editing.hub_id,
-        editing.dia_semana,
-        editing.horario,
-        periodo.data_inicio,
-        periodo.data_fim
-      );
-
-      if (metaConflitante) {
-        await dbColetas.removeEmptyByMetaCriteriaInRange(
-          metaConflitante.hub_id,
-          metaConflitante.dia_semana,
-          metaConflitante.horario,
-          periodo.data_inicio,
-          periodo.data_fim
+    for (const dia of diasSelecionados) {
+      for (const t of turnos) {
+        const existente = metas.find(
+          (m) => m.hub_id === form.hub_id && m.dia_semana === dia && m.turno === t.turno
         );
-        await dbMetas.update(metaConflitante.id, { ...form, dia_semana: diaSelecionado });
-        await dbMetas.remove(editing.id);
-      } else {
-        await dbMetas.update(editing.id, { ...form, dia_semana: diaSelecionado });
-      }
-    } else {
-      for (const dia of diasSelecionados) {
-        const metaExistente = metas.find((m) => m.hub_id === form.hub_id && m.dia_semana === dia);
-        if (metaExistente) {
-          await dbColetas.removeEmptyByMetaCriteriaInRange(
-            metaExistente.hub_id,
-            metaExistente.dia_semana,
-            metaExistente.horario,
-            periodo.data_inicio,
-            periodo.data_fim
-          );
-          await dbMetas.update(metaExistente.id, { ...form, dia_semana: dia });
-        } else {
-          await dbMetas.create({ ...form, dia_semana: dia });
+
+        if (existente) {
+          if (existente.horario !== t.horario || existente.meta !== t.meta) {
+            // Remove apenas as coletas ainda sem agendamento para recriar com o novo horário/meta
+            await dbColetas.removeEmptyByMetaCriteriaInRange(
+              form.hub_id,
+              dia,
+              t.turno,
+              periodo.data_inicio,
+              periodo.data_fim
+            );
+          }
+          await dbMetas.update(existente.id, {
+            hub_id: form.hub_id,
+            dia_semana: dia,
+            turno: t.turno,
+            horario: t.horario,
+            meta: t.meta,
+            ativo: t.ativo,
+          });
+        } else if (t.ativo) {
+          await dbMetas.create({
+            hub_id: form.hub_id,
+            dia_semana: dia,
+            turno: t.turno,
+            horario: t.horario,
+            meta: t.meta,
+            ativo: true,
+          });
         }
       }
     }
+
     // Gera coletas automaticamente para o período selecionado
     await dbMetas.gerarRecorrentes(form.hub_id, periodo.data_inicio, periodo.data_fim);
     setModalOpen(false);
@@ -140,7 +151,7 @@ export function MetasPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     // Remove também as coletas geradas a partir desta meta
-    await dbColetas.removeByMetaCriteria(deleteTarget.hub_id, deleteTarget.dia_semana, deleteTarget.horario);
+    await dbColetas.removeByMetaCriteria(deleteTarget.hub_id, deleteTarget.dia_semana, deleteTarget.turno);
     await dbMetas.remove(deleteTarget.id);
     setDeleting(false);
     setDeleteTarget(null);
@@ -149,15 +160,32 @@ export function MetasPage() {
 
   const handleReplicar = async () => {
     if (!replicarMeta || replicarDias.length === 0) return;
+    const origem = metas.filter(
+      (m) => m.hub_id === replicarMeta.hub_id && m.dia_semana === replicarMeta.dia_semana
+    );
     for (const dia of replicarDias) {
       if (dia === replicarMeta.dia_semana) continue;
-      await dbMetas.create({
-        hub_id: replicarMeta.hub_id,
-        dia_semana: dia,
-        horario: replicarMeta.horario,
-        meta: replicarMeta.meta,
-        ativo: true,
-      });
+      for (const t of origem) {
+        const existente = metas.find(
+          (m) => m.hub_id === replicarMeta.hub_id && m.dia_semana === dia && m.turno === t.turno
+        );
+        if (existente) {
+          await dbMetas.update(existente.id, {
+            horario: t.horario,
+            meta: t.meta,
+            ativo: t.ativo,
+          });
+        } else {
+          await dbMetas.create({
+            hub_id: replicarMeta.hub_id,
+            dia_semana: dia,
+            turno: t.turno,
+            horario: t.horario,
+            meta: t.meta,
+            ativo: t.ativo,
+          });
+        }
+      }
     }
     // Gera coletas automaticamente após replicar
     await dbMetas.gerarRecorrentes(replicarMeta.hub_id);
@@ -188,6 +216,7 @@ export function MetasPage() {
       'HUB': m.hub?.sigla || '',
       'Cidade': m.hub?.cidade?.nome || '',
       'Dia da semana': DIAS_SEMANA[m.dia_semana || 0],
+      'Turno': turnoLabel(m.turno),
       'Horário': formatTime(m.horario),
       'Meta': m.meta,
       'Ativo': m.ativo ? 'Sim' : 'Não',
@@ -199,7 +228,7 @@ export function MetasPage() {
     <div>
       <PageHeader
         title="Gestão de Metas"
-        description="Defina metas de condutores por HUB, dia da semana e horário"
+        description="Defina metas de condutores por HUB, dia da semana e turno"
         actions={
           <>
             <button className="btn-secondary" onClick={exportarMetas}>
@@ -258,6 +287,7 @@ export function MetasPage() {
                   <th className="text-left px-5 py-3">HUB</th>
                   <th className="text-left px-5 py-3">Cidade</th>
                   <th className="text-left px-5 py-3">Dia</th>
+                  <th className="text-left px-5 py-3">Turno</th>
                   <th className="text-left px-5 py-3">Horário</th>
                   <th className="text-left px-5 py-3">Meta</th>
                   <th className="text-left px-5 py-3">Status</th>
@@ -270,6 +300,9 @@ export function MetasPage() {
                     <td className="px-5 py-3 font-medium text-slate-800">{m.hub?.sigla}</td>
                     <td className="px-5 py-3 text-slate-600">{m.hub?.cidade?.nome}</td>
                     <td className="px-5 py-3 text-slate-600">{DIAS_SEMANA[m.dia_semana]}</td>
+                    <td className="px-5 py-3">
+                      <Badge variant="info">{turnoLabel(m.turno)}</Badge>
+                    </td>
                     <td className="px-5 py-3 text-slate-600">{formatTime(m.horario)}</td>
                     <td className="px-5 py-3">
                       <Badge variant="info">{m.meta} condutores</Badge>
@@ -306,7 +339,7 @@ export function MetasPage() {
       </div>
 
       {/* Modal Nova/Editar Meta */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Meta' : 'Nova Meta'}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Metas do Dia' : 'Nova Meta'}>
         <div className="space-y-4">
           <div>
             <label className="label">HUB</label>
@@ -350,7 +383,7 @@ export function MetasPage() {
               ))}
             </div>
             {!editing && (
-              <p className="text-xs text-slate-500 mt-1">Será criada uma meta para cada dia selecionado, com o mesmo horário e meta.</p>
+              <p className="text-xs text-slate-500 mt-1">Serão criadas as metas de cada turno ativo para todos os dias selecionados.</p>
             )}
           </div>
           <div>
@@ -399,60 +432,83 @@ export function MetasPage() {
             <p className="text-xs text-slate-500 mt-1">As coletas serão geradas apenas para os dias selecionados dentro deste período.</p>
           </div>
           <div>
-            <label className="label">Horário</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {[
-                { label: 'Manhã', horario: '08:00' },
-                { label: '08:30', horario: '08:30' },
-                { label: '09:00', horario: '09:00' },
-                { label: 'Tarde', horario: '14:00' },
-                { label: '14:30', horario: '14:30' },
-                { label: '15:00', horario: '15:00' },
-                { label: '17:00', horario: '17:00' },
-                { label: 'Noite', horario: '18:00' },
-                { label: '19:00', horario: '19:00' },
-                { label: '20:00', horario: '20:00' },
-              ].map((t) => (
-                <button
-                  key={t.horario}
-                  type="button"
-                  className={`px-3 py-1 text-xs rounded-full border transition ${
-                    form.horario === t.horario
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+            <label className="label">Turnos do dia</label>
+            <div className="space-y-2">
+              {turnos.map((t) => (
+                <div
+                  key={t.turno}
+                  className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition ${
+                    t.ativo ? 'border-blue-300 bg-blue-50/60' : 'border-slate-200 bg-slate-50/60 opacity-80'
                   }`}
-                  onClick={() => setForm({ ...form, horario: t.horario })}
                 >
-                  {t.label}
-                </button>
+                  <label className="flex items-center gap-2 min-w-[110px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={t.ativo}
+                      onChange={(e) => setTurno(t.turno, { ativo: e.target.checked })}
+                    />
+                    <span className="text-sm font-semibold text-slate-700">{turnoLabel(t.turno)}</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Horário</span>
+                    <input
+                      type="time"
+                      className="input w-32"
+                      value={t.horario}
+                      disabled={!t.ativo}
+                      onChange={(e) => setTurno(t.turno, { horario: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Meta</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="input w-24"
+                      value={t.meta}
+                      disabled={!t.ativo}
+                      onChange={(e) => setTurno(t.turno, { meta: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
-            <input type="time" className="input" value={form.horario} onChange={(e) => setForm({ ...form, horario: e.target.value })} />
-          </div>
-          <div>
-            <label className="label">Meta de condutores</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {[10, 15, 20, 25, 28, 30, 32, 35, 40].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`px-3 py-1 text-xs rounded-full border transition ${
-                    form.meta === m
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                  }`}
-                  onClick={() => setForm({ ...form, meta: m })}
-                >
-                  {m}
-                </button>
-              ))}
+            <p className="text-xs text-slate-500 mt-2">
+              Cada turno ativo gera uma coleta por dia da semana, com o seu próprio horário e a sua própria meta.
+            </p>
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">Horários:</span>
+                {[
+                  { label: '08 / 14 / 18', horarios: ['08:00', '14:00', '18:00'] },
+                  { label: '07 / 13 / 19', horarios: ['07:00', '13:00', '19:00'] },
+                  { label: '06 / 12 / 21', horarios: ['06:00', '12:00', '21:00'] },
+                ].map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    className="px-2.5 py-1 text-xs rounded-full border bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                    onClick={() => setTurnos((prev) => prev.map((t, i) => ({ ...t, horario: p.horarios[i] || t.horario })))}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">Meta:</span>
+                {[10, 15, 20, 25, 28, 30, 32, 35, 40].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className="px-2.5 py-1 text-xs rounded-full border bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                    onClick={() => setTurnos((prev) => prev.map((t) => ({ ...t, meta: m })))}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input type="number" min={0} className="input" value={form.meta} onChange={(e) => setForm({ ...form, meta: Number(e.target.value) })} />
           </div>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={form.ativo} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} />
-            <span className="text-sm text-slate-700">Ativo</span>
-          </label>
           <div className="flex justify-end gap-2 pt-2">
             <button className="btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
             <button className="btn-primary" onClick={save}>Salvar</button>
@@ -465,7 +521,7 @@ export function MetasPage() {
         {replicarMeta && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Replicar a meta <strong>{replicarMeta.hub?.sigla} — {formatTime(replicarMeta.horario)} — {replicarMeta.meta} condutores</strong> para:
+              Replicar as metas de <strong>{replicarMeta.hub?.sigla} — {DIAS_SEMANA[replicarMeta.dia_semana]}</strong> (todos os turnos do dia) para:
             </p>
             <div className="grid grid-cols-2 gap-2">
               {DIAS_SEMANA.map((d, i) => (
@@ -519,7 +575,7 @@ export function MetasPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Excluir meta"
-        message={`Deseja excluir a meta ${deleteTarget?.hub?.sigla} - ${DIAS_SEMANA[deleteTarget?.dia_semana || 0]} às ${deleteTarget ? formatTime(deleteTarget.horario) : ''}? Todas as coletas geradas a partir desta meta também serão removidas.`}
+        message={`Deseja excluir a meta ${deleteTarget?.hub?.sigla} - ${DIAS_SEMANA[deleteTarget?.dia_semana || 0]} - ${turnoLabel(deleteTarget?.turno)} às ${deleteTarget ? formatTime(deleteTarget.horario) : ''}? Todas as coletas geradas a partir desta meta também serão removidas.`}
         confirmLabel="Excluir tudo"
         loading={deleting}
       />
