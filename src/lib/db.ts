@@ -65,7 +65,7 @@ export const dbCondutores = {
       .select('*, cidade:cidades(*), hub:hubs(*), rota_fixa:rotas_fixas(*)')
       .order('nome_completo');
     if (search) {
-      q = q.or(`nome_completo.ilike.%${search}%, telefone.ilike.%${search}%, cpf.ilike.%${search}%, observacoes.ilike.%${search}%`);
+      q = q.or(`nome_completo.ilike.%${search}%, telefone.ilike.%${search}%, cpf.ilike.%${search}%, codigo.ilike.%${search}%, observacoes.ilike.%${search}%`);
     }
     return q;
   },

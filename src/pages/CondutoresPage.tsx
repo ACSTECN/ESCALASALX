@@ -28,6 +28,7 @@ export function CondutoresPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Condutor | null>(null);
   const [form, setForm] = useState({
+    codigo: '',
     nome_completo: '',
     cpf: '',
     telefone: '',
@@ -105,6 +106,7 @@ export function CondutoresPage() {
     const hubMap = new Map(hubs.map((h) => [h.id, h.sigla]));
     const rotaMap = new Map(rotas.map((r) => [r.id, r.sigla]));
     const linhas = condutoresFiltrados.map((c) => ({
+      'ID': c.codigo || '',
       'Nome': c.nome_completo,
       'Rota': c.rota_fixa?.sigla || rotaMap.get(c.rota_fixa_id || '') || '',
       'CPF': c.cpf || '',
@@ -122,6 +124,7 @@ export function CondutoresPage() {
     setForm(
       cd
         ? {
+            codigo: cd.codigo || '',
             nome_completo: cd.nome_completo,
             cpf: cd.cpf || '',
             telefone: cd.telefone || '',
@@ -131,14 +134,18 @@ export function CondutoresPage() {
             status: cd.status,
             observacoes: cd.observacoes || '',
           }
-        : { nome_completo: '', cpf: '', telefone: '', cidade_id: '', hub_id: '', rota_fixa_id: '', status: 'ativo', observacoes: '' }
+        : { codigo: '', nome_completo: '', cpf: '', telefone: '', cidade_id: '', hub_id: '', rota_fixa_id: '', status: 'ativo', observacoes: '' }
     );
     setModalOpen(true);
   };
 
   const save = async () => {
     if (!form.nome_completo.trim()) return;
-    const payload = { ...form, rota_fixa_id: form.rota_fixa_id || null };
+    const payload = {
+      ...form,
+      codigo: form.codigo.trim() || null,
+      rota_fixa_id: form.rota_fixa_id || null,
+    };
     if (editing) {
       await dbCondutores.update(editing.id, payload);
     } else {
@@ -599,7 +606,7 @@ export function CondutoresPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             className="input pl-10"
-            placeholder="Buscar por nome ou telefone..."
+            placeholder="Buscar por ID, nome, CPF ou telefone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -672,6 +679,7 @@ export function CondutoresPage() {
                       </button>
                     </th>
                   )}
+                  <th className="text-left px-5 py-3">ID</th>
                   <th className="text-left px-5 py-3">Condutor</th>
                   <th className="text-left px-5 py-3">CPF</th>
                   <th className="text-left px-5 py-3">Telefone</th>
@@ -704,6 +712,7 @@ export function CondutoresPage() {
                         </button>
                       </td>
                     )}
+                    <td className="px-5 py-3 text-slate-500 font-mono text-xs">{cd.codigo || '—'}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold text-sm">
@@ -766,7 +775,16 @@ export function CondutoresPage() {
               placeholder="Nome do condutor"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="label">ID</label>
+              <input
+                className="input"
+                value={form.codigo}
+                onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                placeholder="ID do condutor"
+              />
+            </div>
             <div>
               <label className="label">CPF</label>
               <input

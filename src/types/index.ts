@@ -51,6 +51,7 @@ export interface RotaFixa {
 
 export interface Condutor {
   id: string;
+  codigo: string | null;
   nome_completo: string;
   cpf: string | null;
   telefone: string | null;
