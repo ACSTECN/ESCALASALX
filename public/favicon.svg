@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="14" y1="14" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA"/>
+      <stop offset="0.55" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <filter id="glow" x="0" y="0" width="64" height="64" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="6" y="6" width="52" height="52" rx="18" fill="url(#bg)"/>
+  <rect x="6.75" y="6.75" width="50.5" height="50.5" rx="17.25" stroke="#38BDF8" stroke-opacity=".22" stroke-width="1.5"/>
+
+  <g filter="url(#glow)">
+    <path d="M28 18H22.5C18.358 18 15 21.358 15 25.5V38.5C15 42.642 18.358 46 22.5 46H28" stroke="url(#neon)" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M29 18H37.5C42.747 18 47 22.253 47 27.5C47 32.747 42.747 37 37.5 37H29" stroke="url(#neon)" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M29 37L44 46" stroke="url(#neon)" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <g transform="translate(39 11)">
+    <rect x="0.5" y="0.5" width="14" height="14" rx="4" fill="#081225" stroke="#38BDF8" stroke-opacity=".35"/>
+    <path d="M4 3V1.5M11 3V1.5M3.5 5.5H11.5" stroke="#60A5FA" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M4.2 9.1L6.2 11.1L10.8 6.5" stroke="#67E8F9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,18 @@
+# Configuração do Supabase para o projeto Escalas CR
+# Ref: dnkposvhajloqqtjtjny
+
+project_id = "dnkposvhajloqqtjtjny"
+
+[functions.gmail-auth-url]
+verify_jwt = true
+
+[functions.gmail-status]
+verify_jwt = true
+
+# Chamada pelo Google (sem JWT) após o consentimento OAuth
+[functions.gmail-oauth-callback]
+verify_jwt = false
+
+# Chamada pelo Supabase Cron (autenticação por x-sync-secret) ou por admin
+[functions.gmail-sync]
+verify_jwt = false
