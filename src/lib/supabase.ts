@@ -20,5 +20,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+export const alxDb = supabase.schema('alx');
 export const isSupabaseConfigured = isConfigured;
 export { supabaseUrl, supabaseAnonKey };

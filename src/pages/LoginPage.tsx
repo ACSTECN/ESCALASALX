@@ -204,7 +204,7 @@ export function LoginPage() {
                 Para tornar um usuário admin, execute no Supabase SQL:
               </p>
               <code className="mt-3 block rounded-2xl border border-slate-200 bg-slate-50 p-3 text-slate-700">
-                update usuarios set perfil = 'admin' where email = 'seu@email.com';
+                update alx.usuarios set perfil = 'admin' where email = 'seu@email.com';
               </code>
             </div>
           </div>

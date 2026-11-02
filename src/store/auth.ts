@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Usuario, PerfilUsuario } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { alxDb, supabase } from '@/lib/supabase';
 
 interface AuthState {
   user: Usuario | null;
@@ -28,11 +28,36 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: null, loading: false, initialized: true });
       return;
     }
-    const { data } = await supabase
+    const authUser = session.session.user;
+
+    let { data } = await alxDb
       .from('usuarios')
       .select('*')
-      .eq('id', session.session.user.id)
-      .single();
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (!data) {
+      const nome =
+        (authUser.user_metadata?.nome as string | undefined) ||
+        authUser.email?.split('@')[0] ||
+        'Usuario';
+
+      await alxDb.rpc('upsert_usuario', {
+        p_user_id: authUser.id,
+        p_nome: nome,
+        p_email: authUser.email ?? '',
+        p_perfil: 'operador',
+      });
+
+      const { data: perfilCriado } = await alxDb
+        .from('usuarios')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      data = perfilCriado;
+    }
+
     set({ user: (data as Usuario) || null, loading: false, initialized: true });
   },
 }));
