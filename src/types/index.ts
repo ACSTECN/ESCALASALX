@@ -78,6 +78,8 @@ export interface Coleta {
   horario: string;
   meta: number;
   status: StatusColeta;
+  liberado: boolean;
+  liberado_em: string | null;
   is_demo: boolean;
   created_by: string | null;
   created_at: string;
@@ -85,6 +87,7 @@ export interface Coleta {
   // joined
   hub?: Hub;
   agendamentos?: Agendamento[];
+  grupos?: { grupo_id: string }[];
   // calculado
   agendados_count?: number;
   vagas_disponiveis?: number;
@@ -140,16 +143,13 @@ export interface InteresseEntregador {
 export interface Grupo {
   id: string;
   nome: string;
-  hub_id: string;
-  dias: number[];
-  turnos: number[];
   ativo: boolean;
   observacao: string | null;
   is_demo: boolean;
   created_at: string;
   updated_at: string;
   // joined
-  hub?: Hub;
+  vinculos?: { condutor_id: string }[];
   condutores_count?: number;
 }
 

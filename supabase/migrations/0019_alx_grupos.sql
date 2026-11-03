@@ -1,13 +1,14 @@
 -- ============================================================
 -- 0019_alx_grupos.sql
--- Grupos de entregadores + auto-agendamento pelo link publico.
+-- Grupos de entregadores + liberacao de agenda (elegibilidade).
 --
--- Regra de negocio:
---  - O admin cria um grupo com HUB + dias da semana + turnos.
---  - Os entregadores sao vinculados ao grupo colando uma lista de CPFs.
---  - O entregador, no link /entregador, se identifica (nome + CPF + telefone)
---    e ve somente os dias/turnos elegiveis do(s) grupo(s) dele.
---  - Ele nunca ve a QUANTIDADE de vagas, apenas se esta DISPONIVEL.
+-- Regra de negocio (revisada):
+--  - O GRUPO e apenas um "balde" de pessoas: nome + lista de entregadores.
+--  - A elegibilidade e definida na COLETA (no calendario): o operador
+--    marca uma coleta/turno como LIBERADA para um ou mais grupos.
+--  - Quando liberada (com data/hora de abertura), os entregadores daquele
+--    grupo ja visualizam o horario no link /entregador e podem pegar.
+--  - O entregador NUNCA ve a QUANTIDADE de vagas, apenas se esta DISPONIVEL.
 --  - Ao pegar, ele e agendado automaticamente no turno escolhido.
 --  - Se nao houver vaga, ele recebe aviso e pode entrar na lista de espera.
 --
@@ -28,18 +29,22 @@ $$;
 -- ============================================================
 -- 2) TABELAS
 -- ============================================================
+
+-- Grupo = nome + membros (sem HUB/dias/turnos: isso agora e na coleta)
 create table if not exists alx.grupos (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
-  hub_id uuid not null references alx.hubs(id) on delete cascade,
-  dias smallint[] not null default '{}',
-  turnos smallint[] not null default '{}',
   ativo boolean not null default true,
   observacao text,
   is_demo boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Normaliza caso a versao anterior (grupo com HUB/dias/turnos) ja tenha rodado
+alter table alx.grupos drop column if exists hub_id;
+alter table alx.grupos drop column if exists dias;
+alter table alx.grupos drop column if exists turnos;
 
 create table if not exists alx.grupo_condutores (
   grupo_id uuid not null references alx.grupos(id) on delete cascade,
@@ -48,38 +53,51 @@ create table if not exists alx.grupo_condutores (
   primary key (grupo_id, condutor_id)
 );
 
--- ============================================================
--- 3) LISTA DE ESPERA COM TURNO
--- ============================================================
-alter table alx.interesses_entregador
-  add column if not exists turno smallint;
+-- Elegibilidade: quais grupos podem pegar cada coleta
+create table if not exists alx.coleta_grupos (
+  coleta_id uuid not null references alx.coletas(id) on delete cascade,
+  grupo_id uuid not null references alx.grupos(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (coleta_id, grupo_id)
+);
+
+-- Liberacao da coleta
+alter table alx.coletas add column if not exists liberado boolean not null default false;
+alter table alx.coletas add column if not exists liberado_em timestamptz;
+
+-- Lista de espera com turno
+alter table alx.interesses_entregador add column if not exists turno smallint;
 
 -- ============================================================
--- 4) INDICES
+-- 3) INDICES
 -- ============================================================
-create index if not exists idx_alx_grupos_hub on alx.grupos(hub_id);
 create index if not exists idx_alx_grupo_condutores_condutor on alx.grupo_condutores(condutor_id);
+create index if not exists idx_alx_coleta_grupos_grupo on alx.coleta_grupos(grupo_id);
+create index if not exists idx_alx_coleta_grupos_coleta on alx.coleta_grupos(coleta_id);
+create index if not exists idx_alx_coletas_liberado on alx.coletas(liberado);
 create index if not exists idx_alx_condutores_cpf_digits on alx.condutores(alx.only_digits(cpf));
 
 -- ============================================================
--- 5) GRANTS
+-- 4) GRANTS
 -- ============================================================
 grant select, insert, update, delete on alx.grupos to authenticated;
 grant select, insert, update, delete on alx.grupo_condutores to authenticated;
-grant all on alx.grupos, alx.grupo_condutores to service_role;
+grant select, insert, update, delete on alx.coleta_grupos to authenticated;
+grant all on alx.grupos, alx.grupo_condutores, alx.coleta_grupos to service_role;
 
 -- ============================================================
--- 6) TRIGGERS
+-- 5) TRIGGERS
 -- ============================================================
 drop trigger if exists trg_grupos_updated on alx.grupos;
 create trigger trg_grupos_updated before update on alx.grupos
   for each row execute function alx.set_updated_at();
 
 -- ============================================================
--- 7) RLS
+-- 6) RLS
 -- ============================================================
 alter table alx.grupos enable row level security;
 alter table alx.grupo_condutores enable row level security;
+alter table alx.coleta_grupos enable row level security;
 
 drop policy if exists "grupos_select" on alx.grupos;
 create policy "grupos_select" on alx.grupos
@@ -99,11 +117,20 @@ create policy "grupo_condutores_write" on alx.grupo_condutores
   for all using (alx.get_user_perfil() in ('admin', 'supervisor', 'operador'))
   with check (alx.get_user_perfil() in ('admin', 'supervisor', 'operador'));
 
+drop policy if exists "coleta_grupos_select" on alx.coleta_grupos;
+create policy "coleta_grupos_select" on alx.coleta_grupos
+  for select using (alx.get_user_perfil() in ('admin', 'supervisor', 'operador', 'visualizador'));
+
+drop policy if exists "coleta_grupos_write" on alx.coleta_grupos;
+create policy "coleta_grupos_write" on alx.coleta_grupos
+  for all using (alx.get_user_perfil() in ('admin', 'supervisor', 'operador'))
+  with check (alx.get_user_perfil() in ('admin', 'supervisor', 'operador'));
+
 -- ============================================================
--- 8) FUNCOES PUBLICAS DO ENTREGADOR (SECURITY DEFINER -> anon)
+-- 7) FUNCOES PUBLICAS DO ENTREGADOR (SECURITY DEFINER -> anon)
 -- ============================================================
 
--- 8.1) Retorna a agenda visivel para o entregador (somente dias/turnos elegiveis).
+-- 7.1) Agenda visivel: somente coletas LIBERADAS para algum grupo do entregador.
 --      Nao expoe meta nem quantidade de agendamentos, apenas "disponivel".
 create or replace function alx.entregador_agenda(
   p_nome text,
@@ -134,7 +161,7 @@ begin
     return jsonb_build_object('encontrado', false, 'motivo', 'nao_cadastrado');
   end if;
 
-  select coalesce(jsonb_agg(s order by s->>'data_coleta', (s->>'turno')::int), '[]'::jsonb)
+  select coalesce(jsonb_agg(s order by s->>'data_coleta', (s->>'turno')::int, s->>'horario'), '[]'::jsonb)
   into v_slots
   from (
     select jsonb_build_object(
@@ -155,17 +182,17 @@ begin
     ) as s
     from alx.coletas c
     join alx.hubs h on h.id = c.hub_id
-    where c.data_coleta >= current_date
+    where c.liberado = true
+      and c.data_coleta >= current_date
       and c.status <> 'cancelada'
       and exists (
         select 1
-        from alx.grupo_condutores gc
-        join alx.grupos g on g.id = gc.grupo_id
-        where gc.condutor_id = v_cond.id
+        from alx.coleta_grupos cg
+        join alx.grupo_condutores gc on gc.grupo_id = cg.grupo_id
+        join alx.grupos g on g.id = cg.grupo_id
+        where cg.coleta_id = c.id
+          and gc.condutor_id = v_cond.id
           and g.ativo = true
-          and g.hub_id = c.hub_id
-          and extract(dow from c.data_coleta)::smallint = any(g.dias)
-          and c.turno = any(g.turnos)
       )
   ) t;
 
@@ -183,8 +210,8 @@ begin
 end;
 $$;
 
--- 8.2) O entregador pega a vaga -> agendamento automatico.
---      Valida elegibilidade, duplicidade e vagas disponiveis.
+-- 7.2) O entregador pega a vaga -> agendamento automatico.
+--      Valida liberacao, elegibilidade, duplicidade e vagas disponiveis.
 create or replace function alx.entregador_agendar(
   p_cpf text,
   p_coleta_id uuid
@@ -214,15 +241,18 @@ begin
     return jsonb_build_object('ok', false, 'motivo', 'coleta_indisponivel');
   end if;
 
+  if v_coleta.liberado = false then
+    return jsonb_build_object('ok', false, 'motivo', 'nao_elegivel');
+  end if;
+
   select exists (
     select 1
-    from alx.grupo_condutores gc
-    join alx.grupos g on g.id = gc.grupo_id
-    where gc.condutor_id = v_cond.id
+    from alx.coleta_grupos cg
+    join alx.grupo_condutores gc on gc.grupo_id = cg.grupo_id
+    join alx.grupos g on g.id = cg.grupo_id
+    where cg.coleta_id = p_coleta_id
+      and gc.condutor_id = v_cond.id
       and g.ativo = true
-      and g.hub_id = v_coleta.hub_id
-      and extract(dow from v_coleta.data_coleta)::smallint = any(g.dias)
-      and v_coleta.turno = any(g.turnos)
   ) into v_elegivel;
 
   if not v_elegivel then
@@ -252,7 +282,7 @@ exception
 end;
 $$;
 
--- 8.3) Sem vaga -> entra na lista de espera existente.
+-- 7.3) Sem vaga -> entra na lista de espera existente.
 create or replace function alx.entregador_lista_espera(
   p_nome text,
   p_cpf text,
@@ -303,7 +333,7 @@ end;
 $$;
 
 -- ============================================================
--- 9) EXECUTE PARA ANON (link publico do entregador)
+-- 8) EXECUTE PARA ANON (link publico do entregador)
 -- ============================================================
 grant execute on function alx.only_digits(text) to anon, authenticated, service_role;
 grant execute on function alx.entregador_agenda(text, text, text) to anon, authenticated, service_role;
@@ -311,6 +341,8 @@ grant execute on function alx.entregador_agendar(text, uuid) to anon, authentica
 grant execute on function alx.entregador_lista_espera(text, text, text, uuid) to anon, authenticated, service_role;
 
 comment on table alx.grupos is
-'Grupos de entregadores por HUB com dias e turnos elegiveis para auto-agendamento';
+'Grupo de entregadores (nome + membros) usado para liberar agendas';
+comment on table alx.coleta_grupos is
+'Define para quais grupos uma coleta foi liberada (elegibilidade do entregador)';
 comment on function alx.entregador_agenda(text, text, text) is
-'Agenda publica do entregador: retorna apenas dias/turnos elegiveis, sem expor quantidade de vagas';
+'Agenda publica do entregador: retorna apenas coletas liberadas para os grupos dele, sem expor quantidade de vagas';

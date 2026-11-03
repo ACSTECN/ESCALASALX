@@ -211,6 +211,7 @@ export function WeeklyCalendar({
             onColetaUpdated();
             setSelectedColeta(null);
           }}
+          onRefresh={onColetaUpdated}
         />
 
         <ConfirmDialog
@@ -343,6 +344,7 @@ export function WeeklyCalendar({
           onColetaUpdated();
           setSelectedColeta(null);
         }}
+        onRefresh={onColetaUpdated}
       />
 
       <ConfirmDialog

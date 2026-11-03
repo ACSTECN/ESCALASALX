@@ -67,6 +67,11 @@ export function ColetaCard({ coleta, thresholds, onClick, selectable, selected, 
         <span className="px-1.5 py-0.5 rounded bg-slate-200/80 text-[10px] font-semibold text-slate-600 dark:bg-slate-700/70 dark:text-slate-300">
           {turnoLabel(coleta.turno)}
         </span>
+        {coleta.liberado && (
+          <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+            LIBERADA
+          </span>
+        )}
       </div>
 
       <div className="flex items-baseline gap-1 mb-1">

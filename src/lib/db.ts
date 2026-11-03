@@ -133,6 +133,7 @@ export const dbColetas = {
       .select(
         `*,
          hub:hubs(*, cidade:cidades(*)),
+         grupos:coleta_grupos(grupo_id),
          agendamentos:agendamentos(*, condutor:condutores(*, rota_fixa:rotas_fixas(*)))`
       )
       .gte('data_coleta', startDate)
@@ -147,6 +148,7 @@ export const dbColetas = {
       .select(
         `*,
          hub:hubs(*, cidade:cidades(*)),
+         grupos:coleta_grupos(grupo_id),
          agendamentos:agendamentos(*, condutor:condutores(*, rota_fixa:rotas_fixas(*)))`
       )
       .eq('data_coleta', date)
@@ -159,6 +161,7 @@ export const dbColetas = {
       .select(
         `*,
          hub:hubs(*, cidade:cidades(*)),
+         grupos:coleta_grupos(grupo_id),
          agendamentos:agendamentos(*, condutor:condutores(*, rota_fixa:rotas_fixas(*)))`
       )
       .eq('id', id)
@@ -171,6 +174,35 @@ export const dbColetas = {
     alxDb.from('coletas').update(data).eq('id', id).select().single(),
 
   remove: (id: string) => alxDb.from('coletas').delete().eq('id', id),
+
+  // Grupos liberados para esta coleta (elegibilidade do entregador)
+  listGrupos: (coletaId: string) =>
+    alxDb
+      .from('coleta_grupos')
+      .select('grupo_id, grupo:grupos(id, nome)')
+      .eq('coleta_id', coletaId),
+
+  // Libera/bloqueia a coleta para um conjunto de grupos
+  setGruposLiberados: async (coletaId: string, grupoIds: string[]) => {
+    await alxDb.from('coleta_grupos').delete().eq('coleta_id', coletaId);
+
+    if (grupoIds.length > 0) {
+      const { error } = await alxDb
+        .from('coleta_grupos')
+        .insert(grupoIds.map((grupo_id) => ({ coleta_id: coletaId, grupo_id })));
+      if (error) return { error };
+    }
+
+    return alxDb
+      .from('coletas')
+      .update({
+        liberado: grupoIds.length > 0,
+        liberado_em: grupoIds.length > 0 ? new Date().toISOString() : null,
+      })
+      .eq('id', coletaId)
+      .select()
+      .single();
+  },
 
   // Remove coletas que correspondem a uma meta (mesmo hub, dia da semana e turno)
   removeByMetaCriteria: async (hubId: string, diaSemana: number, turno: number) => {
@@ -350,13 +382,13 @@ export const dbGrupos = {
   list: () =>
     alxDb
       .from('grupos')
-      .select('*, hub:hubs(*, cidade:cidades(*)), vinculos:grupo_condutores(condutor_id)')
+      .select('*, vinculos:grupo_condutores(condutor_id)')
       .order('nome'),
 
   listAtivos: () =>
     alxDb
       .from('grupos')
-      .select('*, hub:hubs(*, cidade:cidades(*))')
+      .select('*')
       .eq('ativo', true)
       .order('nome'),
 
