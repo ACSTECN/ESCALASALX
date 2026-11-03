@@ -128,12 +128,62 @@ export interface InteresseEntregador {
   fez_integracao: boolean | null;
   hub_id: string;
   data_interesse: string;
+  turno: number | null;
   status: StatusInteresse;
   observacao: string | null;
   created_at: string;
   updated_at: string;
   // joined
   hub?: Hub;
+}
+
+export interface Grupo {
+  id: string;
+  nome: string;
+  hub_id: string;
+  dias: number[];
+  turnos: number[];
+  ativo: boolean;
+  observacao: string | null;
+  is_demo: boolean;
+  created_at: string;
+  updated_at: string;
+  // joined
+  hub?: Hub;
+  condutores_count?: number;
+}
+
+export interface GrupoCondutor {
+  grupo_id: string;
+  condutor_id: string;
+  created_at: string;
+  // joined
+  condutor?: Condutor;
+}
+
+export interface EntregadorSlot {
+  coleta_id: string;
+  data_coleta: string;
+  turno: number;
+  horario: string;
+  hub_id: string;
+  hub_sigla: string;
+  hub_nome: string;
+  disponivel: boolean;
+  ja_agendado: boolean;
+}
+
+export interface EntregadorAgenda {
+  encontrado: boolean;
+  motivo?: string;
+  condutor?: {
+    id: string;
+    nome: string;
+    cpf: string;
+    telefone: string | null;
+    hub_id: string | null;
+  };
+  slots?: EntregadorSlot[];
 }
 
 export interface Usuario {

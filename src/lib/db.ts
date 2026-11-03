@@ -11,6 +11,9 @@ import type {
   Agendamento,
   Usuario,
   InteresseEntregador,
+  Grupo,
+  GrupoCondutor,
+  EntregadorAgenda,
   StatusAgendamento,
   StatusInteresse,
   GmailStatus,
@@ -339,6 +342,81 @@ export const dbInteresses = {
 
   remove: (id: string) => alxDb.from('interesses_entregador').delete().eq('id', id),
 };
+
+// ============================================================
+// GRUPOS DE ENTREGADORES (eligibilidade para auto-agendamento)
+// ============================================================
+export const dbGrupos = {
+  list: () =>
+    alxDb
+      .from('grupos')
+      .select('*, hub:hubs(*, cidade:cidades(*)), vinculos:grupo_condutores(condutor_id)')
+      .order('nome'),
+
+  listAtivos: () =>
+    alxDb
+      .from('grupos')
+      .select('*, hub:hubs(*, cidade:cidades(*))')
+      .eq('ativo', true)
+      .order('nome'),
+
+  create: (data: Partial<Grupo>) =>
+    alxDb.from('grupos').insert(data).select().single(),
+
+  update: (id: string, data: Partial<Grupo>) =>
+    alxDb.from('grupos').update(data).eq('id', id).select().single(),
+
+  remove: (id: string) => alxDb.from('grupos').delete().eq('id', id),
+
+  listCondutores: (grupoId: string) =>
+    alxDb
+      .from('grupo_condutores')
+      .select('*, condutor:condutores(*, hub:hubs(*))')
+      .eq('grupo_id', grupoId),
+
+  addCondutores: (grupoId: string, condutorIds: string[]) =>
+    alxDb
+      .from('grupo_condutores')
+      .upsert(
+        condutorIds.map((condutor_id) => ({ grupo_id: grupoId, condutor_id })),
+        { onConflict: 'grupo_id,condutor_id', ignoreDuplicates: true }
+      ),
+
+  removeCondutor: (grupoId: string, condutorId: string) =>
+    alxDb
+      .from('grupo_condutores')
+      .delete()
+      .eq('grupo_id', grupoId)
+      .eq('condutor_id', condutorId),
+
+  removeAllCondutores: (grupoId: string) =>
+    alxDb.from('grupo_condutores').delete().eq('grupo_id', grupoId),
+};
+
+// ============================================================
+// LINK PUBLICO DO ENTREGADOR (auto-agendamento)
+// ============================================================
+export const dbEntregador = {
+  agenda: (nome: string, cpf: string, telefone: string) =>
+    alxDb.rpc('entregador_agenda', {
+      p_nome: nome,
+      p_cpf: cpf,
+      p_telefone: telefone,
+    }),
+
+  agendar: (cpf: string, coletaId: string) =>
+    alxDb.rpc('entregador_agendar', { p_cpf: cpf, p_coleta_id: coletaId }),
+
+  listaEspera: (nome: string, cpf: string, telefone: string, coletaId: string) =>
+    alxDb.rpc('entregador_lista_espera', {
+      p_nome: nome,
+      p_cpf: cpf,
+      p_telefone: telefone,
+      p_coleta_id: coletaId,
+    }),
+};
+
+export type { EntregadorAgenda, Grupo, GrupoCondutor };
 
 // ============================================================
 // USUÁRIOS

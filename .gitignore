@@ -18,6 +18,9 @@ dist-ssr
 # Supabase CLI (estado local, específico do projeto)
 supabase/.temp
 
+# Vercel (metadados locais do projeto)
+.vercel
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
