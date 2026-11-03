@@ -21,6 +21,11 @@ import type { Grupo, Condutor, GrupoCondutor } from '@/types';
 import { useAuthStore, canWrite } from '@/store/auth';
 
 const apenasDigitos = (v: string | null | undefined) => (v || '').replace(/\D/g, '');
+const formatarCpf = (v: string) => {
+  const d = apenasDigitos(v).slice(0, 11);
+  if (d.length !== 11) return v.trim();
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
 
 interface GrupoComVinculos extends Grupo {
   vinculos?: { condutor_id: string }[];
@@ -50,7 +55,7 @@ export function GruposPage() {
   const [deleteTarget, setDeleteTarget] = useState<Grupo | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Modal vincular entregadores (colar IDs/CPFs)
+  // Modal vincular entregadores por CPF
   const [gerirGrupo, setGerirGrupo] = useState<Grupo | null>(null);
   const [vinculados, setVinculados] = useState<GrupoCondutor[]>([]);
   const [loadingVinculos, setLoadingVinculos] = useState(false);
@@ -60,6 +65,7 @@ export function GruposPage() {
     vinculados: number;
     naoEncontrados: string[];
   } | null>(null);
+  const [buscaRegistrado, setBuscaRegistrado] = useState('');
   const [buscaVinculado, setBuscaVinculado] = useState('');
 
   const loadData = async () => {
@@ -76,22 +82,17 @@ export function GruposPage() {
 
   const indiceCondutores = useMemo(() => {
     const porCpf = new Map<string, Condutor>();
-    const porCodigo = new Map<string, Condutor>();
     for (const c of condutores) {
       const d = apenasDigitos(c.cpf);
       if (d.length === 11) porCpf.set(d, c);
-      if (c.codigo) porCodigo.set(c.codigo.trim().toLowerCase(), c);
     }
-    return { porCpf, porCodigo };
+    return { porCpf };
   }, [condutores]);
 
   const acharCondutor = (token: string): Condutor | undefined => {
-    const cpfs = apenasDigitos(token);
-    if (cpfs.length === 11) {
-      const porCpf = indiceCondutores.porCpf.get(cpfs);
-      if (porCpf) return porCpf;
-    }
-    return indiceCondutores.porCodigo.get(token.trim().toLowerCase());
+    const cpf = apenasDigitos(token);
+    if (cpf.length !== 11) return undefined;
+    return indiceCondutores.porCpf.get(cpf);
   };
 
   const gruposFiltrados = useMemo(() => {
@@ -147,6 +148,7 @@ export function GruposPage() {
     setGerirGrupo(grupo);
     setColarIds('');
     setResultadoVinculo(null);
+    setBuscaRegistrado('');
     setBuscaVinculado('');
     setLoadingVinculos(true);
     const { data } = await dbGrupos.listCondutores(grupo.id);
@@ -169,9 +171,14 @@ export function GruposPage() {
     const ids = new Set<string>();
     const naoEncontrados: string[] = [];
     for (const token of tokens) {
+      const cpf = apenasDigitos(token);
+      if (cpf.length !== 11) {
+        naoEncontrados.push(token.trim());
+        continue;
+      }
       const condutor = acharCondutor(token);
       if (condutor) ids.add(condutor.id);
-      else naoEncontrados.push(token);
+      else naoEncontrados.push(formatarCpf(cpf));
     }
 
     if (ids.size === 0) {
@@ -196,6 +203,17 @@ export function GruposPage() {
     loadData();
   };
 
+  const vincularCondutorRegistrado = async (condutorId: string) => {
+    if (!gerirGrupo) return;
+    setSalvandoVinculos(true);
+    await dbGrupos.addCondutores(gerirGrupo.id, [condutorId]);
+    const { data } = await dbGrupos.listCondutores(gerirGrupo.id);
+    setVinculados((data as GrupoCondutor[]) || []);
+    setSalvandoVinculos(false);
+    setResultadoVinculo({ vinculados: 1, naoEncontrados: [] });
+    loadData();
+  };
+
   const vinculadosFiltrados = useMemo(() => {
     const termo = buscaVinculado.trim().toLowerCase();
     if (!termo) return vinculados;
@@ -209,11 +227,26 @@ export function GruposPage() {
     });
   }, [vinculados, buscaVinculado]);
 
+  const condutoresRegistradosFiltrados = useMemo(() => {
+    const idsVinculados = new Set(vinculados.map((v) => v.condutor_id));
+    const termo = buscaRegistrado.trim().toLowerCase();
+
+    return condutores
+      .filter((c) => !idsVinculados.has(c.id))
+      .filter((c) => {
+        if (!termo) return true;
+        const cpf = c.cpf || '';
+        const cpfDigitos = apenasDigitos(c.cpf);
+        return cpf.includes(termo) || cpfDigitos.includes(apenasDigitos(termo));
+      })
+      .slice(0, 12);
+  }, [condutores, vinculados, buscaRegistrado]);
+
   return (
     <div>
       <PageHeader
         title="Grupos de Entregadores"
-        description="Monte os grupos colando a lista de IDs/CPFs. A liberação da agenda é feita no calendário, coleta por coleta."
+        description="Monte os grupos colando a lista de CPFs. A liberação da agenda é feita no calendário, coleta por coleta."
         actions={
           canEdit && (
             <button className="btn-primary" onClick={() => openModal()}>
@@ -242,7 +275,7 @@ export function GruposPage() {
           <EmptyState
             icon={<Layers size={36} />}
             title="Nenhum grupo criado"
-            description="Crie um grupo e cole a lista de IDs/CPFs dos entregadores. Depois libere as coletas para ele no calendário."
+            description="Crie um grupo e cole a lista de CPFs dos entregadores. Depois libere as coletas para ele no calendário."
           />
         ) : (
           <div className="divide-y divide-slate-100">
@@ -275,7 +308,7 @@ export function GruposPage() {
                       className="btn-secondary !py-1.5 !px-3 text-xs inline-flex items-center gap-1"
                       onClick={() => abrirVincular(grupo)}
                     >
-                      <UserPlus size={14} /> Colar IDs/CPFs
+                      <UserPlus size={14} /> Colar CPFs
                     </button>
                     {canEdit && (
                       <>
@@ -354,7 +387,7 @@ export function GruposPage() {
         </div>
       </Modal>
 
-      {/* Modal vincular entregadores por ID/CPF */}
+      {/* Modal vincular entregadores por CPF */}
       <Modal
         open={!!gerirGrupo}
         onClose={() => setGerirGrupo(null)}
@@ -364,17 +397,17 @@ export function GruposPage() {
         {gerirGrupo && (
           <div className="space-y-5">
             <div>
-              <label className="label">Colar lista de IDs ou CPFs</label>
+              <label className="label">Colar lista de CPFs</label>
               <textarea
                 className="input font-mono text-xs"
                 rows={5}
                 value={colarIds}
                 onChange={(e) => setColarIds(e.target.value)}
-                placeholder={'Cole aqui os IDs ou CPFs (um por linha, ou separados por vírgula/espaço)\nEx.:\n99\n123.456.789-00\n98765432100'}
+                placeholder={'Cole aqui os CPFs (um por linha, ou separados por vírgula/espaço)\nEx.:\n123.456.789-00\n98765432100'}
               />
               <div className="mt-2 flex items-center justify-between gap-2">
                 <p className="text-xs text-slate-500">
-                  Aceita o ID (código) do condutor ou o CPF. Os não encontrados no cadastro são listados abaixo.
+                  Aceita somente CPF. Se o CPF não existir na base, ele não entra no grupo e aparece abaixo.
                 </p>
                 <button
                   className="btn-primary !py-1.5 !px-3 text-xs whitespace-nowrap"
@@ -397,13 +430,63 @@ export function GruposPage() {
                     <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                       <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
                       <div>
-                        <p>{resultadoVinculo.naoEncontrados.length} item(ns) não encontrado(s) no cadastro:</p>
+                        <p>{resultadoVinculo.naoEncontrados.length} CPF(s) não encontrado(s) na base:</p>
                         <p className="mt-1 break-all font-mono text-xs">
                           {resultadoVinculo.naoEncontrados.join(', ')}
                         </p>
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 pt-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Procurar CPF nos condutores registrados
+                </div>
+                <div className="relative w-full max-w-xs">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="input py-1.5 pl-8 text-xs"
+                    placeholder="Digite o CPF..."
+                    value={buscaRegistrado}
+                    onChange={(e) => setBuscaRegistrado(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {condutoresRegistradosFiltrados.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  {buscaRegistrado.trim()
+                    ? 'Nenhum CPF encontrado na base para essa busca.'
+                    : 'Todos os condutores encontrados já estão vinculados a este grupo.'}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {condutoresRegistradosFiltrados.map((condutor) => (
+                    <div
+                      key={condutor.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-800">
+                          {condutor.nome_completo}
+                        </div>
+                        <div className="truncate text-xs text-slate-500">
+                          {condutor.cpf || 'Sem CPF'}
+                        </div>
+                      </div>
+                      <button
+                        className="btn-primary !px-3 !py-1.5 text-xs whitespace-nowrap"
+                        onClick={() => vincularCondutorRegistrado(condutor.id)}
+                        disabled={salvandoVinculos}
+                      >
+                        Vincular
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
