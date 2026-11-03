@@ -1,14 +1,15 @@
-import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Trash2, CheckSquare, Square, X } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Trash2, CheckSquare, Square, X, Layers } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getWeekDays, isToday, getOccupancyColor, colorClasses } from '@/utils';
-import type { Coleta, ThresholdsOcupacao } from '@/types';
+import type { Coleta, Grupo, ThresholdsOcupacao } from '@/types';
 import { ColetaCard } from './ColetaCard';
 import { ColetaDetailDrawer } from './ColetaDetailDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { dbColetas } from '@/lib/db';
+import { dbColetas, dbGrupos } from '@/lib/db';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Modal } from '@/components/ui/Modal';
 import { canWrite, useAuthStore } from '@/store/auth';
 
 interface WeeklyCalendarProps {
@@ -37,6 +38,12 @@ export function WeeklyCalendar({
   const [selectionMode, setSelectionMode] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Liberação de grupos em lote (para as coletas selecionadas)
+  const [bulkGruposOpen, setBulkGruposOpen] = useState(false);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [grupoIdsSelecionados, setGrupoIdsSelecionados] = useState<Set<string>>(new Set());
+  const [salvandoLiberacao, setSalvandoLiberacao] = useState(false);
 
   const isMobile = useMediaQuery('(max-width: 768px)');
   const user = useAuthStore((s) => s.user);
@@ -89,6 +96,109 @@ export function WeeklyCalendar({
     exitSelectionMode();
     onColetaUpdated();
   };
+
+  useEffect(() => {
+    dbGrupos.listAtivos().then(({ data }) => setGrupos((data as Grupo[]) || []));
+  }, []);
+
+  const toggleGrupoSelecionado = (id: string) => {
+    setGrupoIdsSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const abrirLiberacaoLote = () => {
+    setGrupoIdsSelecionados(new Set());
+    setBulkGruposOpen(true);
+  };
+
+  const aplicarLiberacaoEmLote = async (modo: 'add' | 'remove') => {
+    if (selectedIds.size === 0 || grupoIdsSelecionados.size === 0) return;
+    setSalvandoLiberacao(true);
+    for (const id of Array.from(selectedIds)) {
+      const coleta = coletas.find((c) => c.id === id);
+      if (!coleta) continue;
+      const ids = new Set((coleta.grupos || []).map((g) => g.grupo_id));
+      grupoIdsSelecionados.forEach((g) => (modo === 'add' ? ids.add(g) : ids.delete(g)));
+      await dbColetas.setGruposLiberados(id, Array.from(ids));
+    }
+    setSalvandoLiberacao(false);
+    setBulkGruposOpen(false);
+    setGrupoIdsSelecionados(new Set());
+    exitSelectionMode();
+    onColetaUpdated();
+  };
+
+  const liberacaoLoteModal = (
+    <Modal
+      open={bulkGruposOpen}
+      onClose={() => setBulkGruposOpen(false)}
+      title="Liberar grupos para as coletas selecionadas"
+      size="md"
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600">
+          Marque os grupos que podem ver e pegar as <strong>{selectedIds.size}</strong> coleta(s)
+          selecionada(s) no link do entregador.
+        </p>
+
+        {grupos.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">
+            Nenhum grupo cadastrado. Crie grupos em <strong>Grupos</strong> para liberar agendas.
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {grupos.map((g) => {
+              const ativo = grupoIdsSelecionados.has(g.id);
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => toggleGrupoSelecionado(g.id)}
+                  className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-sm text-left transition ${
+                    ativo
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {ativo ? (
+                    <CheckSquare size={16} className="text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <Square size={16} className="text-slate-300 flex-shrink-0" />
+                  )}
+                  <span className="truncate font-medium">{g.nome}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            className="btn-primary flex-1 inline-flex items-center justify-center gap-2"
+            onClick={() => aplicarLiberacaoEmLote('add')}
+            disabled={grupoIdsSelecionados.size === 0 || salvandoLiberacao}
+          >
+            <Layers size={16} />
+            {salvandoLiberacao ? 'Salvando...' : 'Liberar selecionadas'}
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => aplicarLiberacaoEmLote('remove')}
+            disabled={grupoIdsSelecionados.size === 0 || salvandoLiberacao}
+          >
+            Remover liberação
+          </button>
+          <button className="btn-secondary" onClick={() => setBulkGruposOpen(false)}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
 
   // Mobile: single day view
   if (isMobile) {
@@ -189,6 +299,13 @@ export function WeeklyCalendar({
               {selectedIds.size} selecionada(s)
             </span>
             <button
+              className="btn-secondary flex items-center gap-1 text-xs px-3 py-1.5 disabled:opacity-50"
+              onClick={abrirLiberacaoLote}
+              disabled={selectedIds.size === 0}
+            >
+              <Layers size={14} /> Liberar
+            </button>
+            <button
               className="btn-danger flex items-center gap-1 text-xs px-3 py-1.5 disabled:opacity-50"
               onClick={() => setConfirmDelete(true)}
               disabled={selectedIds.size === 0}
@@ -223,6 +340,8 @@ export function WeeklyCalendar({
           confirmLabel="Excluir todas"
           loading={deleting}
         />
+
+        {liberacaoLoteModal}
       </div>
     );
   }
@@ -328,6 +447,13 @@ export function WeeklyCalendar({
             {selectedIds.size} coleta(s) selecionada(s)
           </span>
           <button
+            className="btn-secondary flex items-center gap-1 disabled:opacity-50"
+            onClick={abrirLiberacaoLote}
+            disabled={selectedIds.size === 0}
+          >
+            <Layers size={16} /> Liberar grupos
+          </button>
+          <button
             className="btn-danger flex items-center gap-1 disabled:opacity-50"
             onClick={() => setConfirmDelete(true)}
             disabled={selectedIds.size === 0}
@@ -356,6 +482,8 @@ export function WeeklyCalendar({
         confirmLabel="Excluir todas"
         loading={deleting}
       />
+
+      {liberacaoLoteModal}
     </div>
   );
 }
