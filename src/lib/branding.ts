@@ -4,18 +4,14 @@
 const env = import.meta.env;
 
 export const branding = {
-  // Letras exibidas no logo (ex.: "ALX").
   initials: (env.VITE_BRAND_INITIALS as string) || 'ALX',
-  // Palavra exibida junto às letras no logo (ex.: "LOGISTICS").
-  wordmark: (env.VITE_BRAND_WORDMARK as string) || 'LOGISTICS',
-  // Nome completo da marca (usado em cabeçalhos e chips).
-  fullName: (env.VITE_BRAND_NAME as string) || 'ALX Logistics',
-  // Nome do produto/aplicação (usado no título da página e rodapés).
-  appName: (env.VITE_APP_NAME as string) || 'Escalas ALX',
-  // Subtítulo padrão do logo.
-  tagline: (env.VITE_BRAND_TAGLINE as string) || 'Sistema de Escalas',
-  // Rótulo do rodapé das telas públicas.
-  footerLabel: (env.VITE_BRAND_FOOTER as string) || 'Escalas ALX · Gestão de Coletas',
+  wordmark: (env.VITE_BRAND_WORDMARK as string) || 'ENTREGAS',
+  fullName: (env.VITE_BRAND_NAME as string) || 'ALX Entregas',
+  appName: (env.VITE_APP_NAME as string) || 'Agendamento de Escalas',
+  tagline: (env.VITE_BRAND_TAGLINE as string) || 'Agendamento de Escalas',
+  footerLabel: (env.VITE_BRAND_FOOTER as string) || 'ALX Entregas · Agendamento de Escalas',
+  logoSrc: '/logo-alx.png',
+  bannerSrc: '/agendamento-escalas.png',
 } as const;
 
 // Funcionalidades opcionais por instalação.

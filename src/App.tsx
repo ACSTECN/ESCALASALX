@@ -54,7 +54,7 @@ function AppRoutes() {
         <Route
           path="grupos"
           element={
-            <ProtectedRoute roles={['admin', 'supervisor']}>
+            <ProtectedRoute roles={['admin', 'supervisor', 'operador']}>
               <GruposPage />
             </ProtectedRoute>
           }
@@ -88,7 +88,7 @@ function AppRoutes() {
         <Route
           path="dashboard"
           element={
-            <ProtectedRoute roles={['admin', 'supervisor', 'visualizador']}>
+            <ProtectedRoute roles={['admin', 'supervisor', 'operador', 'visualizador']}>
               <DashboardPage />
             </ProtectedRoute>
           }
@@ -96,7 +96,7 @@ function AppRoutes() {
         <Route
           path="cidades-hubs"
           element={
-            <ProtectedRoute roles={['admin']}>
+            <ProtectedRoute roles={['admin', 'operador']}>
               <CidadesHubsPage />
             </ProtectedRoute>
           }
@@ -104,7 +104,7 @@ function AppRoutes() {
         <Route
           path="historico"
           element={
-            <ProtectedRoute roles={['admin', 'supervisor']}>
+            <ProtectedRoute roles={['admin', 'supervisor', 'operador']}>
               <HistoricoPage />
             </ProtectedRoute>
           }

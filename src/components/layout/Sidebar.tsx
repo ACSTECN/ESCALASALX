@@ -32,14 +32,14 @@ const navItems: NavItem[] = [
   { to: '/', label: 'Calendário', icon: CalendarDays, roles: ['admin', 'supervisor', 'operador', 'visualizador'] },
   { to: '/metas', label: 'Gestão de Metas', icon: Target, roles: ['admin', 'supervisor'] },
   { to: '/condutores', label: 'Condutores', icon: Users, roles: ['admin', 'supervisor', 'operador'] },
-  { to: '/grupos', label: 'Grupos', icon: Layers, roles: ['admin', 'supervisor'] },
+  { to: '/grupos', label: 'Grupos', icon: Layers, roles: ['admin', 'supervisor', 'operador'] },
   { to: '/rotas', label: 'Rotas Fixas', icon: Route, roles: ['admin', 'supervisor', 'operador'] },
   { to: '/escala-amanha', label: 'Escala de Amanhã', icon: Sun, roles: ['admin', 'supervisor', 'operador', 'visualizador'] },
   { to: '/lista-espera', label: 'Lista de Espera', icon: ClipboardList, roles: ['admin', 'supervisor', 'operador', 'visualizador'] },
   { to: '/mensagens', label: 'Mensagens MAGALOG', icon: Mail, roles: ['admin', 'supervisor', 'operador', 'visualizador'], requiresGmail: true },
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'supervisor', 'visualizador'] },
-  { to: '/cidades-hubs', label: 'Cidades & HUBs', icon: MapPin, roles: ['admin'] },
-  { to: '/historico', label: 'Histórico', icon: History, roles: ['admin', 'supervisor'] },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'supervisor', 'operador', 'visualizador'] },
+  { to: '/cidades-hubs', label: 'Cidades & HUBs', icon: MapPin, roles: ['admin', 'operador'] },
+  { to: '/historico', label: 'Histórico', icon: History, roles: ['admin', 'supervisor', 'operador'] },
   { to: '/configuracoes', label: 'Configurações', icon: Settings, roles: ['admin'] },
 ];
 

@@ -58,12 +58,6 @@ const normalizarNome = (value: string) =>
     .trim()
     .toLowerCase();
 
-const labelIntegracao = (fezIntegracao: boolean | null) => {
-  if (fezIntegracao === true) return 'Já fez';
-  if (fezIntegracao === false) return 'Não fez';
-  return 'Não informado';
-};
-
 export function ListaEsperaPage() {
   const user = useAuthStore((s) => s.user);
   const canEdit = canWrite(user?.perfil);
@@ -121,7 +115,7 @@ export function ListaEsperaPage() {
       if (filtroData && it.data_interesse !== filtroData) return false;
       if (filtroStatus && it.status !== filtroStatus) return false;
       if (termo) {
-        const hay = `${it.nome} ${it.cpf} ${it.telefone || ''} ${labelIntegracao(it.fez_integracao)}`.toLowerCase();
+        const hay = `${it.nome} ${it.cpf} ${it.telefone || ''}`.toLowerCase();
         if (!hay.includes(termo)) return false;
       }
       return true;
@@ -287,7 +281,6 @@ export function ListaEsperaPage() {
       Nome: i.nome,
       CPF: i.cpf,
       Telefone: i.telefone || '',
-      'Primeira Integração': labelIntegracao(i.fez_integracao),
       Cidade: i.hub?.cidade?.nome || cidadeMap.get(i.hub?.cidade_id || '') || '',
       HUB: i.hub?.sigla || '',
       Data: formatDateBR(i.data_interesse),
@@ -445,7 +438,6 @@ export function ListaEsperaPage() {
                     </th>
                   )}
                   <th className="px-4 py-3 text-left font-medium">Entregador</th>
-                  <th className="px-4 py-3 text-left font-medium">Integração</th>
                   <th className="px-4 py-3 text-left font-medium">HUB</th>
                   <th className="px-4 py-3 text-left font-medium">Cidade</th>
                   <th className="px-4 py-3 text-left font-medium">Dia</th>
@@ -471,9 +463,6 @@ export function ListaEsperaPage() {
                           CPF {i.cpf}
                           {i.telefone ? ` · ${i.telefone}` : ''}
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-slate-700">{labelIntegracao(i.fez_integracao)}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-medium text-slate-700">{i.hub?.sigla || '—'}</span>
@@ -568,9 +557,6 @@ export function ListaEsperaPage() {
                 <span className="flex items-center gap-1.5">
                   <Clock size={14} className="text-brand-600" />
                   {formatDateBR(approveTarget.data_interesse)} · {diaSemana(approveTarget.data_interesse)}
-                </span>
-                <span className="text-xs font-medium text-slate-500">
-                  Integração: {labelIntegracao(approveTarget.fez_integracao)}
                 </span>
               </div>
             </div>

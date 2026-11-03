@@ -61,7 +61,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
     nomes: '',
     cpfs: '',
     telefones: '',
-    integracoes: '',
   });
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{
@@ -83,7 +82,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<StatusAgendamento>('agendado');
   const [confirmBulkRemove, setConfirmBulkRemove] = useState(false);
-  const [updatingIntegrationId, setUpdatingIntegrationId] = useState<string | null>(null);
 
   // Transferência de escala (mover selecionados para outro dia)
   const [transferOpen, setTransferOpen] = useState(false);
@@ -175,30 +173,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
     onUpdated();
   };
 
-  const atualizarObservacaoIntegracao = (observacoes: string | null | undefined, fezIntegracao: boolean) => {
-    const partes = (observacoes || '')
-      .split('|')
-      .map((parte) => parte.trim())
-      .filter(Boolean)
-      .filter((parte) => !/^integração:/i.test(parte) && !/^integracao:/i.test(parte));
-
-    partes.unshift(`Integração: ${fezIntegracao ? 'Sim' : 'Não'}`);
-    return partes.join(' | ');
-  };
-
-  const alterarIntegracao = async (ag: Agendamento, value: 'sim' | 'nao') => {
-    if (!ag.condutor?.id) return;
-
-    setUpdatingIntegrationId(ag.id);
-    const fezIntegracao = value === 'sim';
-    await dbCondutores.update(ag.condutor.id, {
-      fez_integracao: fezIntegracao,
-      observacoes: atualizarObservacaoIntegracao(ag.condutor.observacoes, fezIntegracao),
-    });
-    setUpdatingIntegrationId(null);
-    onUpdated();
-  };
-
   const confirmarCancelamento = async () => {
     if (!cancelTarget) return;
     await dbAgendamentos.remove(cancelTarget.id);
@@ -249,18 +223,16 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
   };
 
   const limparImportacao = () => {
-    setImportColumns({ nomes: '', cpfs: '', telefones: '', integracoes: '' });
+    setImportColumns({ nomes: '', cpfs: '', telefones: '' });
   };
 
   const parseImportColumns = (cols: typeof importColumns) => {
     const splitRows = (text: string) => text.replace(/\r/g, '').split('\n');
-    const toBoolIntegracao = (value: string) => /^(integracao|integração|sim|s|x|1|true)$/i.test(value.trim());
     const nomes = splitRows(cols.nomes);
     const cpfs = splitRows(cols.cpfs);
     const telefones = splitRows(cols.telefones);
-    const integracoes = splitRows(cols.integracoes);
-    const maxRows = Math.max(nomes.length, cpfs.length, telefones.length, integracoes.length);
-    const resultados: { nome: string; cpf: string; telefone: string; fezIntegracao: boolean }[] = [];
+    const maxRows = Math.max(nomes.length, cpfs.length, telefones.length);
+    const resultados: { nome: string; cpf: string; telefone: string }[] = [];
     const erros: string[] = [];
     let total = 0;
 
@@ -270,10 +242,9 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
       const cpfNormalizado = cpfBruto.replace(/\D/g, '');
       const telefoneBruto = (telefones[i] || '').trim();
       const telefoneNormalizado = telefoneBruto.replace(/\D/g, '');
-      const integracao = (integracoes[i] || '').trim();
       const linha = i + 1;
 
-      if (!nome && !cpfNormalizado && !telefoneBruto && !integracao) continue;
+      if (!nome && !cpfNormalizado && !telefoneBruto) continue;
       total++;
       if (!nome) {
         erros.push(`Linha ${linha}: nome não informado.`);
@@ -290,7 +261,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
         nome,
         cpf,
         telefone,
-        fezIntegracao: toBoolIntegracao(integracao),
       });
     }
 
@@ -356,7 +326,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
           nome_completo: item.nome,
           cpf: item.cpf || null,
           telefone: item.telefone || null,
-          fez_integracao: item.fezIntegracao,
           cidade_id: coleta.hub?.cidade_id || null,
           hub_id: coleta.hub_id,
           status: 'ativo',
@@ -380,9 +349,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
       } else {
         const updateData: Partial<Condutor> = {};
         if (item.telefone && !condutor.telefone) updateData.telefone = item.telefone;
-        if ((condutor.fez_integracao ?? false) !== item.fezIntegracao) {
-          updateData.fez_integracao = item.fezIntegracao;
-        }
         if (Object.keys(updateData).length > 0) {
           const { error: erroAtualizacao } = await dbCondutores.update(condutor.id, updateData);
           if (erroAtualizacao) {
@@ -605,7 +571,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
       'Rota': a.condutor?.rota_fixa?.sigla || '',
       'CPF': a.condutor?.cpf || '',
       'Telefone': a.condutor?.telefone || '',
-      'Integração': a.condutor?.fez_integracao ? 'Sim' : 'Não',
       'Observação': a.condutor?.observacoes || '',
       'Status': STATUS_AGENDAMENTO_LABELS[a.status],
       'HUB': coleta.hub?.sigla || '',
@@ -984,15 +949,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
                             {ag.condutor.rota_fixa.sigla}
                           </span>
                         )}
-                        <span
-                          className={`badge ${
-                            ag.condutor?.fez_integracao
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {ag.condutor?.fez_integracao ? 'Integração' : 'Sem integração'}
-                        </span>
                       </div>
                       <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2">
                         <span>{ag.condutor?.telefone || 'Sem telefone'}</span>
@@ -1008,15 +964,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
                   <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-auto">
                     {canEdit ? (
                       <div className="flex flex-col gap-2 md:items-end">
-                        <select
-                          value={ag.condutor?.fez_integracao ? 'sim' : 'nao'}
-                          onChange={(e) => alterarIntegracao(ag, e.target.value as 'sim' | 'nao')}
-                          disabled={updatingIntegrationId === ag.id}
-                          className="text-xs border border-amber-200 rounded-lg px-2 py-2 bg-amber-50 text-amber-800 min-w-[140px]"
-                        >
-                          <option value="nao">Sem integração</option>
-                          <option value="sim">Com integração</option>
-                        </select>
                         <select
                           value={ag.status}
                           onChange={(e) => alterarStatus(ag, e.target.value as StatusAgendamento)}
@@ -1187,11 +1134,10 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
             Somente <strong>Nome</strong> é obrigatório.
           </p>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            CPF, telefone e integração podem ficar em branco. Em <strong>Integração</strong>, deixe em branco quando não for integração.
-            Escreva <strong>integração</strong> quando for. Se CPF ou telefone vierem incompletos, o nome ainda será importado e o dado inválido será ignorado.
+            CPF e telefone podem ficar em branco. Se CPF ou telefone vierem incompletos, o nome ainda será importado e o dado inválido será ignorado.
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div className="lg:col-span-1">
               <label className="label">Colar nomes *</label>
               <textarea
@@ -1217,15 +1163,6 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
                 placeholder={'(11) 91234-5678\n21998765432\n'}
                 value={importColumns.telefones}
                 onChange={(e) => setImportColumns((prev) => ({ ...prev, telefones: e.target.value }))}
-              />
-            </div>
-            <div className="lg:col-span-1">
-              <label className="label">Colar integração</label>
-              <textarea
-                className="input h-56 font-mono text-sm"
-                placeholder={'integração\n\nintegração'}
-                value={importColumns.integracoes}
-                onChange={(e) => setImportColumns((prev) => ({ ...prev, integracoes: e.target.value }))}
               />
             </div>
           </div>

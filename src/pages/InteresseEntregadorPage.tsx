@@ -60,7 +60,6 @@ export function InteresseEntregadorPage() {
   const [legNome, setLegNome] = useState('');
   const [legCpf, setLegCpf] = useState('');
   const [legTelefone, setLegTelefone] = useState('');
-  const [fezIntegracao, setFezIntegracao] = useState<boolean | null>(null);
   const [cidadeId, setCidadeId] = useState('');
   const [hubId, setHubId] = useState('');
   const [data, setData] = useState('');
@@ -225,7 +224,6 @@ export function InteresseEntregadorPage() {
     setErro('');
     if (legNome.trim().length < 3) return setErro('Informe o nome completo.');
     if (legCpf.replace(/\D/g, '').length !== 11) return setErro('Informe um CPF válido (11 dígitos).');
-    if (fezIntegracao === null) return setErro('Informe se você já fez a primeira integração.');
     if (!hubId) return setErro('Selecione o HUB onde quer fazer coleta.');
     if (!data) return setErro('Selecione o dia de interesse.');
     if (data < hoje()) return setErro('A data não pode ser anterior a hoje.');
@@ -238,7 +236,7 @@ export function InteresseEntregadorPage() {
       nome: legNome.trim(),
       cpf: legCpf.replace(/\D/g, ''),
       telefone: legTelefone.trim() || null,
-      fez_integracao: fezIntegracao,
+      fez_integracao: null,
       hub_id: hubId,
       data_interesse: data,
       status: 'pendente',
@@ -263,7 +261,6 @@ export function InteresseEntregadorPage() {
     setLegNome('');
     setLegCpf('');
     setLegTelefone('');
-    setFezIntegracao(null);
     setCidadeId('');
     setHubId('');
     setData('');
@@ -278,7 +275,7 @@ export function InteresseEntregadorPage() {
           <div className="absolute inset-0 tech-grid opacity-20" />
           <div className="relative z-10 flex h-full flex-col justify-between">
             <div>
-              <BrandLogo light subtitle="Agenda do Entregador" />
+              <BrandLogo light subtitle="" />
               <h1 className="mt-10 max-w-xl text-4xl font-black leading-tight tracking-[0.08em] text-white">
                 Veja os dias liberados e garanta seu turno.
               </h1>
@@ -307,7 +304,7 @@ export function InteresseEntregadorPage() {
 
         <div className="w-full">
           <div className="mb-8 flex justify-center lg:hidden">
-            <BrandLogo light subtitle="Agenda do Entregador" />
+            <BrandLogo light subtitle="" />
           </div>
 
           <div className="tech-panel overflow-hidden">
@@ -390,34 +387,6 @@ export function InteresseEntregadorPage() {
                           placeholder="(00) 00000-0000"
                           inputMode="numeric"
                         />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="label">Já fez a primeira integração? *</label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setFezIntegracao(true)}
-                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
-                            fezIntegracao === true
-                              ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
-                              : 'border-slate-200 text-slate-600 hover:border-cyan-300'
-                          }`}
-                        >
-                          Sim, já fiz
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFezIntegracao(false)}
-                          className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
-                            fezIntegracao === false
-                              ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
-                              : 'border-slate-200 text-slate-600 hover:border-cyan-300'
-                          }`}
-                        >
-                          Não fiz ainda
-                        </button>
                       </div>
                     </div>
 

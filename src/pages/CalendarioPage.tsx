@@ -109,12 +109,12 @@ export function CalendarioPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(37,99,235,0.18),_transparent_32%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.10),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(37,99,235,0.10),_transparent_30%)]" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <BrandLogo compact subtitle="Painel Semanal" />
+            <BrandLogo compact subtitle="" />
             <h2 className="mt-4 text-2xl font-black tracking-[0.08em] text-slate-950 dark:text-slate-100">
-              Controle visual de escala com leitura rapida de ocupacao.
+              Agenda semanal de coletas.
             </h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              A semana fica toda visivel, com filtros e acompanhamento direto de HUB, metas e agendamentos.
+              Visualize os turnos abertos, acompanhe ocupação e organize a operação por HUB.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-3">

@@ -4,7 +4,6 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 import { Mail, Lock, Loader2, ShieldCheck, RadioTower, Sparkles } from 'lucide-react';
 import { BrandLogo } from '@/components/ui/BrandLogo';
-import { branding } from '@/lib/branding';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -88,14 +87,13 @@ export function LoginPage() {
           <div className="absolute inset-0 tech-grid opacity-20" />
           <div className="relative z-10 flex h-full flex-col justify-between">
             <div className="space-y-8">
-              <BrandLogo light subtitle="Sistema de Escalas" />
+              <BrandLogo light subtitle="" />
               <div className="max-w-xl">
                 <h1 className="text-4xl font-black leading-tight tracking-[0.08em] text-white">
-                  Operacao de escala com cara de plataforma de logistica premium.
+                  Painel operacional da ALX Entregas.
                 </h1>
                 <p className="mt-4 text-base text-slate-300">
-                  Painel com leitura rapida, identidade neon e foco total em produtividade de HUB,
-                  calendarizacao e agendamento em tempo real.
+                  Acompanhe agenda, condutores, grupos e disponibilidade dos HUBs em tempo real.
                 </p>
               </div>
             </div>
@@ -104,17 +102,17 @@ export function LoginPage() {
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                 <ShieldCheck className="text-cyan-300" size={22} />
                 <div className="mt-4 text-xs uppercase tracking-[0.24em] text-slate-400">Acesso</div>
-                <div className="mt-2 text-sm font-semibold text-white">Perfil centralizado e seguro</div>
+                <div className="mt-2 text-sm font-semibold text-white">Perfis com acesso controlado</div>
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                 <RadioTower className="text-cyan-300" size={22} />
                 <div className="mt-4 text-xs uppercase tracking-[0.24em] text-slate-400">Status</div>
-                <div className="mt-2 text-sm font-semibold text-white">Atualizacao em tempo real</div>
+                <div className="mt-2 text-sm font-semibold text-white">Atualização em tempo real</div>
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                 <Sparkles className="text-cyan-300" size={22} />
-                <div className="mt-4 text-xs uppercase tracking-[0.24em] text-slate-400">Visual</div>
-                <div className="mt-2 text-sm font-semibold text-white">Interface mais marcante e sofisticada</div>
+                <div className="mt-4 text-xs uppercase tracking-[0.24em] text-slate-400">Escalas</div>
+                <div className="mt-2 text-sm font-semibold text-white">Agendamento visual por turno</div>
               </div>
             </div>
           </div>
@@ -122,7 +120,7 @@ export function LoginPage() {
 
         <div className="mx-auto w-full max-w-xl">
           <div className="mb-8 flex justify-center lg:hidden">
-            <BrandLogo light subtitle="Sistema de Escalas" />
+            <BrandLogo light subtitle="" />
           </div>
 
           <div className="tech-panel overflow-hidden p-8 lg:p-10">
@@ -130,11 +128,8 @@ export function LoginPage() {
               <div>
                 <h2 className="text-2xl font-black text-slate-900">Acessar sistema</h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  Entre no ambiente operacional para acompanhar metas, agenda e ocupacao dos HUBs.
+                  Entre para acessar o painel de agendamento e operação.
                 </p>
-              </div>
-              <div className="hidden sm:block rounded-2xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-700">
-                {branding.fullName}
               </div>
             </div>
 

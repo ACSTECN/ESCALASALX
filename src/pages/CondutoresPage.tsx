@@ -62,6 +62,7 @@ export function CondutoresPage() {
   } | null>(null);
   const [importMapping, setImportMapping] = useState({
     nome: '',
+    codigo: '',
     cpf: '',
     telefone: '',
     cliente: '',
@@ -273,6 +274,7 @@ export function CondutoresPage() {
         hasHeader: false,
         autoMapping: {
           nome: '',
+          codigo: '',
           cpf: '',
           telefone: '',
           cliente: '',
@@ -290,6 +292,7 @@ export function CondutoresPage() {
     const normalizarCabecalho = (s: string) => normalizarNome(s).replace(/[^a-z0-9 ]/g, '');
     const aliases: Record<string, string[]> = {
       nome: ['nome'],
+      codigo: ['id', 'codigo', 'código'],
       cpf: ['cpf'],
       telefone: ['telefone', 'fone'],
       cliente: ['cliente'],
@@ -309,9 +312,10 @@ export function CondutoresPage() {
 
     const defaultExcelMapping = rows[0]?.length >= 8
       ? {
-          nome: '2',
-          cpf: '3',
-          telefone: rows[0]?.length > 6 ? '6' : '5',
+          nome: '1',
+          codigo: '0',
+          cpf: '2',
+          telefone: rows[0]?.length > 3 ? '3' : '',
           cliente: '1',
           tipo: rows[0]?.length > 7 ? '7' : '',
           consulta: rows[0]?.length > 8 ? '8' : '',
@@ -320,8 +324,9 @@ export function CondutoresPage() {
         }
       : {
           nome: '0',
-          cpf: rows[0]?.length > 1 ? '1' : '',
-          telefone: rows[0]?.length > 2 ? '2' : '',
+          codigo: rows[0]?.length > 1 ? '1' : '',
+          cpf: rows[0]?.length > 2 ? '2' : rows[0]?.length > 1 ? '1' : '',
+          telefone: rows[0]?.length > 3 ? '3' : rows[0]?.length > 2 ? '2' : '',
           cliente: '',
           tipo: '',
           consulta: '',
@@ -332,6 +337,7 @@ export function CondutoresPage() {
     const autoMapping = hasHeader
       ? {
           nome: String(findHeaderIndex(aliases.nome)),
+          codigo: String(findHeaderIndex(aliases.codigo)),
           cpf: String(findHeaderIndex(aliases.cpf)),
           telefone: String(findHeaderIndex(aliases.telefone)),
           cliente: String(findHeaderIndex(aliases.cliente)),
@@ -366,6 +372,7 @@ export function CondutoresPage() {
     const linhas = importPreview.dataRows;
     const registros: Array<{
       nome: string;
+      codigo: string;
       cpf: string;
       telefone: string;
       status: string;
@@ -389,12 +396,14 @@ export function CondutoresPage() {
       const linhaAtual = index + 1;
 
       let nome = '';
+      let codigo = '';
       let cpf = '';
       let telefone = '';
       let status = 'ativo';
       let observacoes = '';
 
       nome = getByMap(partes, 'nome') || partes[0] || '';
+      codigo = (getByMap(partes, 'codigo') || '').trim();
       cpf = soDigitos(getByMap(partes, 'cpf'));
       telefone = limparTelefone(getByMap(partes, 'telefone'));
       status = /inativo/i.test(getByMap(partes, 'ativo')) ? 'inativo' : 'ativo';
@@ -417,6 +426,7 @@ export function CondutoresPage() {
 
       registros.push({
         nome,
+        codigo,
         cpf,
         telefone,
         status,
@@ -460,16 +470,19 @@ export function CondutoresPage() {
     const { data: existentesData } = await dbCondutores.list();
     const existentes = (existentesData as Condutor[]) || [];
     const existentesMap = new Map<string, Condutor>();
+    const existentesPorCodigo = new Map<string, Condutor>();
     const existentesPorNome = new Map<string, Condutor>();
     const existentesPorCpf = new Map<string, Condutor>();
     const existentesPorNomeCurto = new Map<string, Condutor[]>();
 
     const registrarCondutor = (cd: Condutor) => {
       const nomeNormalizado = normalizarNome(cd.nome_completo || '');
+      const codigoNormalizado = (cd.codigo || '').trim().toLowerCase();
       const cpfNormalizado = (cd.cpf || '').replace(/\D/g, '');
       const nomeCurto = nomePrimeiroSegundo(cd.nome_completo || '');
 
       existentesMap.set(`${nomeNormalizado}::${cpfNormalizado}`, cd);
+      if (codigoNormalizado) existentesPorCodigo.set(codigoNormalizado, cd);
       if (nomeNormalizado) existentesPorNome.set(nomeNormalizado, cd);
       if (cpfNormalizado) existentesPorCpf.set(cpfNormalizado, cd);
       if (nomeCurto) {
@@ -490,9 +503,14 @@ export function CondutoresPage() {
     for (const item of parsed.registros) {
       const key = `${normalizarNome(item.nome)}::${item.cpf}`;
       const nomeNormalizado = normalizarNome(item.nome);
+      const codigoNormalizado = (item.codigo || '').trim().toLowerCase();
       const nomeCurto = nomePrimeiroSegundo(item.nome);
 
       let existente = existentesMap.get(key);
+
+      if (!existente && codigoNormalizado) {
+        existente = existentesPorCodigo.get(codigoNormalizado);
+      }
 
       if (!existente && item.cpf) {
         existente = existentesPorCpf.get(item.cpf);
@@ -515,6 +533,7 @@ export function CondutoresPage() {
       if (existente) {
         const updateData: Partial<Condutor> = {};
 
+        if (item.codigo && !existente.codigo) updateData.codigo = item.codigo;
         if (item.cpf && !existente.cpf) updateData.cpf = item.cpf;
         if (item.telefone && !existente.telefone) updateData.telefone = item.telefone;
         if (importCidade && !existente.cidade_id) updateData.cidade_id = importCidade;
@@ -535,6 +554,7 @@ export function CondutoresPage() {
       }
 
       const { data: criado, error } = await dbCondutores.create({
+          codigo: item.codigo || null,
         nome_completo: item.nome,
         cpf: item.cpf || null,
         telefone: item.telefone || null,
@@ -884,9 +904,9 @@ export function CondutoresPage() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
             <p className="font-medium mb-1">Como usar:</p>
             <p>Você pode colar <strong>a planilha inteira do Excel</strong> aqui. O sistema tenta identificar as colunas automaticamente, mas você também pode ajustar abaixo antes de importar.</p>
-            <p className="mt-1">Se não vier planilha completa, também aceita linhas simples com <strong>Nome, CPF e Telefone</strong>. Só o nome é obrigatório.</p>
+            <p className="mt-1">Se não vier planilha completa, também aceita linhas simples com <strong>Nome, ID, CPF e Telefone</strong>. Só o nome é obrigatório.</p>
             <p className="mt-1">Duplicidade é verificada por <strong>CPF</strong>, <strong>nome completo</strong> e também por <strong>primeiro + segundo nome</strong>.</p>
-            <p className="mt-1 text-xs text-blue-600">Exemplo: João da Silva, 123.456.789-00, (11) 91234-5678</p>
+            <p className="mt-1 text-xs text-blue-600">Exemplo: João da Silva, 99, 123.456.789-00, (11) 91234-5678</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -920,7 +940,7 @@ export function CondutoresPage() {
               rows={10}
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder={`ID\tCliente\tNome\tCPF\tSenha\tTelefone\tCelular\tTipo\tConsulta\tAtivo\n3E+05\tGFL - ALX LOGISTICS\tJOAO DA SILVA\t12345678900\t123456\t(11)90000-0000\t(11)98888-7777\tAGREGADO\t25/05/2027\tAtivo`}
+              placeholder={`Nome\tID\tCPF\tTelefone\nJOAO DA SILVA\t99\t12345678900\t(11)90000-0000`}
             />
           </div>
 
@@ -935,6 +955,7 @@ export function CondutoresPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   ['nome', 'Nome'],
+                  ['codigo', 'ID'],
                   ['cpf', 'CPF'],
                   ['telefone', 'Telefone/Celular'],
                   ['cliente', 'Cliente'],
