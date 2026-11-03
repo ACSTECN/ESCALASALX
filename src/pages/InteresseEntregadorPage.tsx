@@ -525,7 +525,7 @@ export function InteresseEntregadorPage() {
                   {porData.length === 0 ? (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
                       <p className="text-sm text-slate-600">
-                        Nenhum dia liberado no momento. Fique de olho, a operação sobe a agenda por grupos.
+                        Sem agendas disponiveis.
                       </p>
                     </div>
                   ) : (
