@@ -417,6 +417,8 @@ export function CondutoresPage() {
       observacoes = observacoesParts.join(' | ');
 
       nome = nome.trim();
+      // Excel costuma remover o zero à esquerda do CPF; recompleta quando ficar com 10 dígitos.
+      if (cpf.length === 10) cpf = cpf.padStart(11, '0');
       cpf = cpf.length === 11 ? cpf : '';
 
       if (!nome) {
@@ -810,9 +812,9 @@ export function CondutoresPage() {
               <input
                 className="input"
                 value={form.cpf}
-                onChange={(e) => setForm({ ...form, cpf: e.target.value.replace(/\D/g, '') })}
+                onChange={(e) => setForm({ ...form, cpf: e.target.value.replace(/\D/g, '').slice(0, 11) })}
                 placeholder="000.000.000-00"
-                maxLength={11}
+                inputMode="numeric"
               />
             </div>
             <div>
