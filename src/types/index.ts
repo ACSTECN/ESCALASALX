@@ -149,7 +149,10 @@ export interface Grupo {
   created_at: string;
   updated_at: string;
   // joined
-  vinculos?: { condutor_id: string }[];
+  vinculos?: {
+    condutor_id: string;
+    condutor?: { nome_completo: string; codigo: string | null; cpf: string | null } | null;
+  }[];
   condutores_count?: number;
 }
 

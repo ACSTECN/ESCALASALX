@@ -10,6 +10,8 @@ import {
   UserPlus,
   CheckCircle2,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
@@ -28,7 +30,10 @@ const formatarCpf = (v: string) => {
 };
 
 interface GrupoComVinculos extends Grupo {
-  vinculos?: { condutor_id: string }[];
+  vinculos?: {
+    condutor_id: string;
+    condutor?: { nome_completo: string; codigo: string | null; cpf: string | null } | null;
+  }[];
 }
 
 export function GruposPage() {
@@ -67,6 +72,16 @@ export function GruposPage() {
   } | null>(null);
   const [buscaRegistrado, setBuscaRegistrado] = useState('');
   const [buscaVinculado, setBuscaVinculado] = useState('');
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+
+  const toggleExpandido = (grupoId: string) => {
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(grupoId)) next.delete(grupoId);
+      else next.add(grupoId);
+      return next;
+    });
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -281,49 +296,73 @@ export function GruposPage() {
           <div className="divide-y divide-slate-100">
             {gruposFiltrados.map((grupo) => {
               const qtd = grupo.vinculos?.length || 0;
+              const expandido = expandidos.has(grupo.id);
               return (
-                <div key={grupo.id} className="p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
-                      <Layers size={18} />
+                <div key={grupo.id} className="p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center">
+                        <Layers size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-800">{grupo.nome}</span>
+                          <Badge variant={grupo.ativo ? 'success' : 'gray'}>
+                            {grupo.ativo ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandido(grupo.id)}
+                            disabled={qtd === 0}
+                            className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600 hover:bg-slate-200 disabled:cursor-default disabled:hover:bg-slate-100"
+                          >
+                            <Users size={12} /> {qtd} entregador(es)
+                            {qtd > 0 && (expandido ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
+                          </button>
+                          {grupo.observacao && <span className="truncate">{grupo.observacao}</span>}
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-slate-800">{grupo.nome}</span>
-                        <Badge variant={grupo.ativo ? 'success' : 'gray'}>
-                          {grupo.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">
-                          <Users size={12} /> {qtd} entregador(es)
-                        </span>
-                        {grupo.observacao && <span className="truncate">{grupo.observacao}</span>}
-                      </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="btn-secondary !py-1.5 !px-3 text-xs inline-flex items-center gap-1"
+                        onClick={() => abrirVincular(grupo)}
+                      >
+                        <UserPlus size={14} /> Gerenciar
+                      </button>
+                      {canEdit && (
+                        <>
+                          <button className="btn-ghost p-1.5" onClick={() => openModal(grupo)}>
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            className="btn-ghost p-1.5 text-red-500"
+                            onClick={() => setDeleteTarget(grupo)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="btn-secondary !py-1.5 !px-3 text-xs inline-flex items-center gap-1"
-                      onClick={() => abrirVincular(grupo)}
-                    >
-                      <UserPlus size={14} /> Colar CPFs
-                    </button>
-                    {canEdit && (
-                      <>
-                        <button className="btn-ghost p-1.5" onClick={() => openModal(grupo)}>
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          className="btn-ghost p-1.5 text-red-500"
-                          onClick={() => setDeleteTarget(grupo)}
+                  {expandido && (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                      {(grupo.vinculos || []).map((v) => (
+                        <span
+                          key={v.condutor_id}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700"
                         >
-                          <Trash2 size={16} />
-                        </button>
-                      </>
-                    )}
-                  </div>
+                          <span className="font-medium">{v.condutor?.nome_completo || 'Condutor'}</span>
+                          {v.condutor?.codigo ? <span className="text-slate-400">· ID {v.condutor.codigo}</span> : null}
+                          {v.condutor?.cpf ? <span className="text-slate-400">· {v.condutor.cpf}</span> : null}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -382,7 +382,7 @@ export const dbGrupos = {
   list: () =>
     alxDb
       .from('grupos')
-      .select('*, vinculos:grupo_condutores(condutor_id)')
+      .select('*, vinculos:grupo_condutores(condutor_id, condutor:condutores(nome_completo, codigo, cpf))')
       .order('nome'),
 
   listAtivos: () =>
