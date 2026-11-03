@@ -174,6 +174,7 @@ export interface EntregadorSlot {
   hub_nome: string;
   disponivel: boolean;
   ja_agendado: boolean;
+  na_lista_espera?: boolean;
 }
 
 export interface EntregadorAgenda {

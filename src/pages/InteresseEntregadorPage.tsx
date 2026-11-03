@@ -202,11 +202,31 @@ export function InteresseEntregadorPage() {
     }
 
     if (resultado?.ok) {
+      setAgenda((prev) =>
+        prev
+          ? {
+              ...prev,
+              slots: (prev.slots || []).map((s) =>
+                s.coleta_id === slot.coleta_id ? { ...s, disponivel: false, na_lista_espera: true } : s
+              ),
+            }
+          : prev
+      );
       setFeedback({
         tipo: 'ok',
         texto: `Você entrou na lista de espera para ${formatDateBR(slot.data_coleta)} · ${turnoLabel(slot.turno)}.`,
       });
     } else if (resultado?.motivo === 'ja_na_lista') {
+      setAgenda((prev) =>
+        prev
+          ? {
+              ...prev,
+              slots: (prev.slots || []).map((s) =>
+                s.coleta_id === slot.coleta_id ? { ...s, disponivel: false, na_lista_espera: true } : s
+              ),
+            }
+          : prev
+      );
       setFeedback({ tipo: 'erro', texto: 'Você já está na lista de espera para este dia.' });
     } else {
       setFeedback({ tipo: 'erro', texto: 'Não foi possível entrar na lista de espera.' });
@@ -561,23 +581,34 @@ export function InteresseEntregadorPage() {
                                       Pegar vaga
                                     </button>
                                   ) : (
-                                    <>
-                                      <span className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
-                                        Sem vagas
-                                      </span>
-                                      <button
-                                        className="btn-secondary !py-1.5 !px-3 text-xs inline-flex items-center gap-1.5"
-                                        disabled={processando}
-                                        onClick={() => entrarListaEspera(slot)}
-                                      >
-                                        {processando ? (
-                                          <Loader2 size={14} className="animate-spin" />
-                                        ) : (
-                                          <UserPlus size={14} />
-                                        )}
-                                        Lista de espera
-                                      </button>
-                                    </>
+                                    <div className="flex flex-col items-end gap-2">
+                                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-right">
+                                        <div className="text-xs font-semibold text-amber-800">
+                                          Sem vagas para o turno
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] text-amber-700">
+                                          Entre na fila e a operação chama você se abrir vaga.
+                                        </div>
+                                      </div>
+                                      {slot.na_lista_espera ? (
+                                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                                          <CheckCircle2 size={14} /> Você já está na fila
+                                        </span>
+                                      ) : (
+                                        <button
+                                          className="btn-secondary !py-1.5 !px-3 text-xs inline-flex items-center gap-1.5"
+                                          disabled={processando}
+                                          onClick={() => entrarListaEspera(slot)}
+                                        >
+                                          {processando ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                          ) : (
+                                            <UserPlus size={14} />
+                                          )}
+                                          Entrar na fila
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>
