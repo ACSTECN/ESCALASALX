@@ -37,7 +37,7 @@ import type {
   Hub,
   Coleta,
 } from '@/types';
-import { DIAS_SEMANA, STATUS_INTERESSE_LABELS } from '@/types';
+import { DIAS_SEMANA, STATUS_INTERESSE_LABELS, turnoLabel } from '@/types';
 import { useAuthStore, canWrite } from '@/store/auth';
 
 const badgeVariant: Record<StatusInteresse, 'warning' | 'success' | 'danger'> = {
@@ -197,7 +197,9 @@ export function ListaEsperaPage() {
     setColetasDisponiveis([]);
     setLoadingColetas(true);
     const { data } = await dbColetas.listByDate(item.data_interesse);
-    const doHub = ((data as Coleta[]) || []).filter((c) => c.hub_id === item.hub_id);
+    const doHub = ((data as Coleta[]) || []).filter(
+      (c) => c.hub_id === item.hub_id && (item.turno == null || c.turno === item.turno)
+    );
     setColetasDisponiveis(doHub);
     if (doHub.length === 1) setSelectedColetaId(doHub[0].id);
     setLoadingColetas(false);
@@ -285,6 +287,7 @@ export function ListaEsperaPage() {
       HUB: i.hub?.sigla || '',
       Data: formatDateBR(i.data_interesse),
       'Dia da Semana': diaSemana(i.data_interesse),
+      Turno: i.turno ? turnoLabel(i.turno) : '',
       Status: STATUS_INTERESSE_LABELS[i.status],
       Observação: i.observacao || '',
       'Registrado em': new Date(i.created_at).toLocaleString('pt-BR'),
@@ -441,6 +444,7 @@ export function ListaEsperaPage() {
                   <th className="px-4 py-3 text-left font-medium">HUB</th>
                   <th className="px-4 py-3 text-left font-medium">Cidade</th>
                   <th className="px-4 py-3 text-left font-medium">Dia</th>
+                  <th className="px-4 py-3 text-left font-medium">Turno</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
                   <th className="px-4 py-3 text-right font-medium">Ações</th>
                 </tr>
@@ -473,6 +477,9 @@ export function ListaEsperaPage() {
                       <td className="px-4 py-3">
                         <div className="text-slate-700">{formatDateBR(i.data_interesse)}</div>
                         <div className="text-xs text-slate-500">{diaSemana(i.data_interesse)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {i.turno ? turnoLabel(i.turno) : '—'}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant={badgeVariant[i.status]}>{STATUS_INTERESSE_LABELS[i.status]}</Badge>
@@ -557,6 +564,7 @@ export function ListaEsperaPage() {
                 <span className="flex items-center gap-1.5">
                   <Clock size={14} className="text-brand-600" />
                   {formatDateBR(approveTarget.data_interesse)} · {diaSemana(approveTarget.data_interesse)}
+                  {approveTarget.turno ? ` · ${turnoLabel(approveTarget.turno)}` : ''}
                 </span>
               </div>
             </div>
@@ -567,7 +575,9 @@ export function ListaEsperaPage() {
                 <div className="text-sm text-slate-500 py-3">Carregando horários...</div>
               ) : coletasDisponiveis.length === 0 ? (
                 <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
-                  Não há coleta cadastrada para este HUB nesta data. Crie a coleta no calendário antes de aprovar.
+                  Não há coleta cadastrada para este HUB
+                  {approveTarget.turno ? ` neste ${turnoLabel(approveTarget.turno).toLowerCase()}` : ''} nesta data.
+                  Crie a coleta no calendário antes de aprovar.
                 </div>
               ) : (
                 <div className="space-y-2">

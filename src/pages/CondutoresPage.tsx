@@ -27,6 +27,8 @@ export function CondutoresPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Condutor | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [form, setForm] = useState({
     codigo: '',
     nome_completo: '',
@@ -122,6 +124,7 @@ export function CondutoresPage() {
 
   const openModal = (cd?: Condutor) => {
     setEditing(cd || null);
+    setSaveError('');
     setForm(
       cd
         ? {
@@ -141,17 +144,35 @@ export function CondutoresPage() {
   };
 
   const save = async () => {
-    if (!form.nome_completo.trim()) return;
+    if (!form.nome_completo.trim()) {
+      setSaveError('Informe o nome completo.');
+      return;
+    }
+
+    setSaving(true);
+    setSaveError('');
     const payload = {
-      ...form,
+      nome_completo: form.nome_completo.trim(),
+      cpf: form.cpf.replace(/\D/g, '').slice(0, 11) || null,
+      telefone: form.telefone.trim() || null,
+      cidade_id: form.cidade_id || null,
+      hub_id: form.hub_id || null,
       codigo: form.codigo.trim() || null,
       rota_fixa_id: form.rota_fixa_id || null,
+      status: form.status,
+      observacoes: form.observacoes.trim() || null,
     };
-    if (editing) {
-      await dbCondutores.update(editing.id, payload);
-    } else {
-      await dbCondutores.create(payload);
+    const { error } = editing
+      ? await dbCondutores.update(editing.id, payload)
+      : await dbCondutores.create(payload);
+
+    setSaving(false);
+
+    if (error) {
+      setSaveError(error.message || 'Não foi possível salvar o condutor.');
+      return;
     }
+
     setModalOpen(false);
     loadData();
   };
@@ -893,9 +914,16 @@ export function CondutoresPage() {
               placeholder="Observações..."
             />
           </div>
+          {saveError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {saveError}
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <button className="btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
-            <button className="btn-primary" onClick={save}>Salvar</button>
+            <button className="btn-primary" onClick={save} disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
           </div>
         </div>
       </Modal>

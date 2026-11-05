@@ -681,12 +681,6 @@ export function InteresseEntregadorPage() {
                     )}
                   </button>
 
-                  <button
-                    className="w-full text-center text-xs text-slate-500 hover:text-slate-700"
-                    onClick={() => setModo('cadastro')}
-                  >
-                    Não está cadastrado? Registrar interesse / lista de espera
-                  </button>
                 </div>
               </>
             )}
