@@ -172,6 +172,8 @@ class MiPontoBot:
     ) -> None:
         data = datetime.strptime(data_coleta, "%Y-%m-%d")
         data_tela = data.strftime("%m-%d")
+        horario_inicio = self.normalizar_horario(horario_inicio)
+        horario_fim = self.normalizar_horario(horario_fim) if horario_fim else None
 
         dia = self.web_wait.until(
             EC.presence_of_element_located(
@@ -179,22 +181,23 @@ class MiPontoBot:
             )
         )
 
-        container = dia.find_element(
-            By.XPATH,
-            "./ancestor::div["
-            f".//button[contains(., '{horario_inicio}')]][1]",
-        )
-
-        botoes = container.find_elements(
-            By.XPATH,
-            f".//button[contains(., '{horario_inicio}')]",
-        )
-
+        seletor_horario = f"contains(., '{horario_inicio}')"
         if horario_fim:
-            botoes = [
-                b for b in botoes
-                if horario_fim in self.texto_elemento(b)
-            ]
+            seletor_horario += f" and contains(., '{horario_fim}')"
+
+        seletor_botao = f".//button[{seletor_horario}]"
+        seletor_container = f"./ancestor::div[.//button[{seletor_horario}]][1]"
+
+        try:
+            # Segue a hierarquia já validada no script funcional do usuário:
+            # localizar a data, subir até o bloco que contém o botão do intervalo.
+            container = dia.find_element(By.XPATH, seletor_container)
+            botoes = container.find_elements(By.XPATH, seletor_botao)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Turno nao localizado para {data_tela}, "
+                f"{horario_inicio}-{horario_fim or '?'}."
+            ) from exc
 
         botoes = [
             b for b in botoes
@@ -204,7 +207,8 @@ class MiPontoBot:
         if len(botoes) != 1:
             raise RuntimeError(
                 f"Turno nao encontrado de forma unica "
-                f"({data_tela} | {horario_inicio} | {estacao}): {len(botoes)} candidatos."
+                f"({data_tela} | {horario_inicio}-{horario_fim or '?'} | "
+                f"{estacao}): {len(botoes)} candidatos."
             )
 
         botao = botoes[0]
@@ -213,6 +217,14 @@ class MiPontoBot:
         botao.click()
 
         self.buscar_campo()
+
+    @staticmethod
+    def normalizar_horario(horario: str) -> str:
+        # Supabase TIME pode chegar como HH:MM:SS; a tela do MiPonto mostra HH:MM.
+        try:
+            return datetime.strptime(horario[:5], "%H:%M").strftime("%H:%M")
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Horario invalido recebido para o turno: {horario!r}") from exc
 
     def pesquisar_condutor(self, valor: str) -> WebElement:
         campo = self.buscar_campo()
