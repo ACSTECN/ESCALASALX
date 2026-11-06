@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { X, Clock, Users, Target, Plus, Trash2, Pencil, Check, Upload, Download, Square, CheckSquare, ArrowRightLeft, Search, Layers } from 'lucide-react';
-import type { Coleta, Condutor, Agendamento, Grupo, StatusAgendamento } from '@/types';
+import { X, Clock, Users, Target, Plus, Trash2, Pencil, Check, Upload, Download, Square, CheckSquare, ArrowRightLeft, Search, Layers, Send } from 'lucide-react';
+import type { Coleta, Condutor, Agendamento, Grupo, StatusAgendamento, MipontoDispatchResponse } from '@/types';
 import { calcColetaStats, dbAgendamentos, dbCondutores, dbColetas, dbGrupos } from '@/lib/db';
+import { enviarColetaParaMiponto } from '@/lib/miponto';
 import { formatDateBR, formatTime, getOccupancyColor, colorClasses, toCSV, downloadFile } from '@/utils';
 import { STATUS_AGENDAMENTO_LABELS, STATUS_COLETA_LABELS, turnoLabel } from '@/types';
 import { Badge } from '@/components/ui/Badge';
@@ -91,6 +92,9 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
   const [transferTargetId, setTransferTargetId] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [transferMsg, setTransferMsg] = useState<string | null>(null);
+  const [enviandoMiponto, setEnviandoMiponto] = useState(false);
+  const [mipontoResult, setMipontoResult] = useState<MipontoDispatchResponse | null>(null);
+  const [mipontoErro, setMipontoErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (coleta) {
@@ -101,6 +105,8 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
       setSelectedCondutor('');
       setBuscaNome('');
       setFiltroStatus('');
+      setMipontoResult(null);
+      setMipontoErro(null);
     }
   }, [coleta]);
 
@@ -582,6 +588,21 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
     downloadFile(csv, `agendamentos_${coleta.hub?.sigla}_${coleta.data_coleta}.csv`);
   };
 
+  const enviarEscalaParaMiponto = async () => {
+    setEnviandoMiponto(true);
+    setMipontoErro(null);
+    setMipontoResult(null);
+
+    try {
+      const result = await enviarColetaParaMiponto(coleta);
+      setMipontoResult(result);
+    } catch (error) {
+      setMipontoErro(error instanceof Error ? error.message : 'Falha ao enviar para o MiPonto.');
+    } finally {
+      setEnviandoMiponto(false);
+    }
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-slate-900/40" onClick={onClose} />
@@ -674,6 +695,55 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
                 <div className={`h-full ${c.bar} rounded-full transition-all`} style={{ width: `${Math.min(ocupacao, 100)}%` }} />
               </div>
             </div>
+
+            {canEdit && (
+              <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/60">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-700 inline-flex items-center gap-1.5">
+                      <Send size={14} className="text-brand-500" /> Enviar turno ao MiPonto
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {agendamentosAtivos.length} condutor(es) ativo(s) neste turno
+                    </p>
+                  </div>
+                  <button
+                    className="btn-secondary flex-shrink-0 inline-flex items-center justify-center gap-2"
+                    onClick={enviarEscalaParaMiponto}
+                    disabled={enviandoMiponto || agendamentosAtivos.length === 0}
+                  >
+                    <Send size={15} />
+                    {enviandoMiponto ? 'Enviando...' : 'Enviar'}
+                  </button>
+                </div>
+
+                {mipontoErro && (
+                  <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {mipontoErro}
+                  </div>
+                )}
+
+                {mipontoResult && (
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 space-y-1">
+                    <div className="font-semibold text-slate-800">{mipontoResult.message}</div>
+                    <div>
+                      Processados: <strong>{mipontoResult.processed}</strong> · Selecionados:{' '}
+                      <strong>{mipontoResult.selected}</strong> · Envio final:{' '}
+                      <strong>{mipontoResult.submit_performed ? 'sim' : 'não'}</strong>
+                    </div>
+                    {mipontoResult.resultados.filter((item) => item.status !== 'selecionado').length > 0 && (
+                      <div className="pt-1 text-amber-700">
+                        {mipontoResult.resultados
+                          .filter((item) => item.status !== 'selecionado')
+                          .slice(0, 4)
+                          .map((item) => `${item.nome}: ${item.detalhe}`)
+                          .join(' | ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {agendamentosAtivos.length > 0 && (
               <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/60">
@@ -812,6 +882,7 @@ export function ColetaDetailDrawer({ coleta, onClose, onUpdated, onRefresh }: Co
                 )}
               </div>
             )}
+
           </div>
 
           <div className="min-h-0 overflow-y-auto px-6 py-5">

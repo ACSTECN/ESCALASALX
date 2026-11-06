@@ -190,6 +190,44 @@ export interface EntregadorAgenda {
   slots?: EntregadorSlot[];
 }
 
+export interface MipontoMotoristaPayload {
+  agendamento_id: string;
+  condutor_id: string;
+  nome: string;
+  cpf: string | null;
+  codigo: string | null;
+  telefone: string | null;
+  status: StatusAgendamento;
+}
+
+export interface MipontoDispatchPayload {
+  coleta_id: string;
+  data_coleta: string;
+  turno: number;
+  horario: string;
+  horario_fim: string | null;
+  hub_id: string;
+  hub_sigla: string;
+  hub_nome: string;
+  motoristas: MipontoMotoristaPayload[];
+}
+
+export interface MipontoDispatchResultado {
+  nome: string;
+  cpf: string | null;
+  status: 'selecionado' | 'ignorado' | 'erro';
+  detalhe: string;
+}
+
+export interface MipontoDispatchResponse {
+  ok: boolean;
+  message: string;
+  processed: number;
+  selected: number;
+  submit_performed: boolean;
+  resultados: MipontoDispatchResultado[];
+}
+
 export interface Usuario {
   id: string;
   nome: string;
