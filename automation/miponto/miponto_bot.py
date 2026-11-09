@@ -24,7 +24,7 @@ class MiPontoSettings:
     url: str
     user: str
     password: str
-    driver_path: str
+    driver_path: str = ""
     headless: bool = False
     timeout: int = 30
     confirm_submit: bool = False
@@ -70,10 +70,9 @@ class MiPontoBot:
         if self.settings.headless:
             options.add_argument("--headless=new")
             options.add_argument("--disable-gpu")
-        self.driver = webdriver.Edge(
-            service=Service(self.settings.driver_path),
-            options=options,
-        )
+        # Sem caminho informado, o Selenium Manager resolve/baixa o driver compativel sozinho.
+        servico = Service(self.settings.driver_path) if self.settings.driver_path else None
+        self.driver = webdriver.Edge(service=servico, options=options)
         self.wait = WebDriverWait(self.driver, self.settings.timeout)
         return self
 

@@ -15,6 +15,12 @@ dist-ssr
 .env.*
 !.env.example
 
+# Build da ponte do MiPonto (Python/PyInstaller)
+__pycache__/
+*.pyc
+build
+*.spec
+
 # Supabase CLI (estado local, específico do projeto)
 supabase/.temp
 

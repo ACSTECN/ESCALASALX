@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import threading
 from pathlib import Path
 
@@ -11,7 +12,11 @@ from .miponto_bot import MiPontoBot, MiPontoSettings
 from .models import DispatchPayload, DispatchResponse
 
 
-BASE_DIR = Path(__file__).resolve().parent
+if getattr(sys, "frozen", False):
+    # Empacotado como .exe: o .env fica ao lado do executavel, nao na pasta temporaria do bundle.
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
@@ -24,7 +29,7 @@ class Settings(BaseSettings):
     miponto_url: str = "https://ponto.meponto.com/login"
     miponto_user: str
     miponto_password: str
-    edge_driver_path: str
+    edge_driver_path: str = ""
     miponto_headless: bool = False
     miponto_timeout: int = 30
     miponto_confirm_submit: bool = False
