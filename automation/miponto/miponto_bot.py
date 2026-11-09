@@ -211,6 +211,12 @@ class MiPontoBot:
         if do_hub:
             candidatos = do_hub
 
+        # A semana inteira repete o mesmo horario e hub; apenas o turno aberto
+        # pode receber escala. Os turnos fechados aparecem com o cadeado.
+        abertos = [b for b in candidatos if "🔒" not in self.texto_elemento(b)]
+        if abertos:
+            candidatos = abertos
+
         if len(candidatos) != 1:
             encontrados = [self.texto_elemento(b) for b in botoes]
             raise RuntimeError(
