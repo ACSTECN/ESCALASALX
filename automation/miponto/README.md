@@ -14,11 +14,10 @@ Servico local para o frontend chamar um Selenium do Edge e registrar a escala do
 
 ## Arquivos
 
-- `launcher.py`: ponto de entrada do executavel
 - `server.py`: API local em FastAPI
 - `miponto_bot.py`: automacao Selenium
 - `models.py`: contrato de entrada e saida
-- `build_exe.ps1`: gera o pacote do executavel
+- `build_package.ps1`: monta o pacote de instalacao
 - `instalador/INSTALAR.cmd` e `instalador/instalar.ps1`: instalam a ponte no PC de destino
 - `.env.example`: configuracao local
 
@@ -39,30 +38,34 @@ MIPONTO_CONFIRM_SUBMIT=true
 - `EDGE_DRIVER_PATH`: deixe **vazio** para o Selenium Manager resolver e baixar o driver do Edge automaticamente (precisa de internet no primeiro uso). Se informar um caminho, ele e usado.
 - `MIPONTO_CONFIRM_SUBMIT=true`: seleciona as pessoas **e** clica no envio final. Use `false` para testar sem efetivar.
 
-## Opcao A - pacote com instalador (recomendado para varios PCs)
+## Instalacao nos PCs que vao enviar
 
-Cada PC que for disparar o envio precisa da ponte rodando. Com o executavel nao e preciso instalar Python.
+Cada PC que for disparar o envio precisa da ponte rodando. Nao precisa de administrador e nao precisa instalar Python na mao: o instalador resolve.
 
 1. Gerar o pacote (apenas uma vez):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File automation\miponto\build_exe.ps1
+powershell -ExecutionPolicy Bypass -File automation\miponto\build_package.ps1
 ```
 
 O pacote sai em `automation\miponto\dist\MiPontoBridge\`:
 
 ```text
-miponto-bridge.exe
 INSTALAR.cmd
 instalar.ps1
+start-bridge.py
+requirements.txt
 .env.example
+app\  (server.py, miponto_bot.py, models.py)
 ```
 
 2. No PC de destino: copiar (ou zipar e enviar) a pasta e dar **2 cliques em `INSTALAR.cmd`**.
 
 O instalador faz tudo:
 
-- copia o executavel para `%LOCALAPPDATA%\MiPontoBridge`
+- garante um Python 3.9+ (baixa o instalador oficial do python.org se faltar)
+- cria o ambiente virtual e instala as dependencias
+- copia o codigo para `%LOCALAPPDATA%\MiPontoBridge`
 - cria o `.env` (usa o do pacote, se existir; senao pergunta usuario e senha do MiPonto)
 - cria o atalho **Ponte MiPonto** na Area de Trabalho e registra o inicio automatico com o Windows
 - sobe a ponte e mostra `Ponte do MiPonto ativa em http://127.0.0.1:8765`
@@ -71,9 +74,12 @@ Rodar o `INSTALAR.cmd` novamente serve para atualizar: o `.env` existente **nunc
 
 Dica: se colocar um `.env` ja preenchido dentro do pacote, ninguem precisa digitar usuario e senha.
 
-Requisitos do PC: Microsoft Edge instalado e internet (o driver e baixado sozinho no primeiro uso).
+Requisitos do PC: Microsoft Edge instalado e internet (o driver do Edge e baixado sozinho no primeiro uso).
 
-## Opcao B - rodar com Python
+> Nao usar `.exe` empacotado: o **Controle de aplicativo inteligente** do Windows 11 bloqueia
+> executaveis nao assinados, sem opcao de "executar assim mesmo".
+
+## Rodar em desenvolvimento
 
 ```powershell
 python -m venv .venv

@@ -1,19 +1,14 @@
-"""Ponto de entrada do executavel da ponte do MiPonto.
+"""Inicia a ponte local do MiPonto na versao Python.
 
-Uso em desenvolvimento:
-    python -m automation.miponto.launcher
+E executado pelo atalho "Ponte MiPonto" e pelo inicio automatico do Windows:
+
+    %LOCALAPPDATA%\\MiPontoBridge\\.venv\\Scripts\\python.exe start-bridge.py
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-if not getattr(sys, "frozen", False):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 import uvicorn
 
-from automation.miponto.server import app
+from app.server import app
 
 HOST = "127.0.0.1"
 PORT = 8765

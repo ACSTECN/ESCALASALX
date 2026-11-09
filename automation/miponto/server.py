@@ -16,7 +16,10 @@ if getattr(sys, "frozen", False):
     # Empacotado como .exe: o .env fica ao lado do executavel, nao na pasta temporaria do bundle.
     BASE_DIR = Path(sys.executable).resolve().parent
 else:
+    # Em Python puro o pacote fica em app\; o .env mora na pasta de instalacao, uma acima.
     BASE_DIR = Path(__file__).resolve().parent
+    if not (BASE_DIR / ".env").exists() and (BASE_DIR.parent / ".env").exists():
+        BASE_DIR = BASE_DIR.parent
 
 
 class Settings(BaseSettings):

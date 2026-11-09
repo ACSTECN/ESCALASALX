@@ -180,42 +180,57 @@ class MiPontoBot:
             )
         )
 
-        seletor_horario = f"contains(., '{horario_inicio}')"
-        if horario_fim:
-            seletor_horario += f" and contains(., '{horario_fim}')"
-
-        seletor_botao = f".//button[{seletor_horario}]"
-        seletor_container = f"./ancestor::div[.//button[{seletor_horario}]][1]"
+        # O MiPonto nem sempre exibe o termino que calculamos (inicio + 4h).
+        # Por isso localizamos pelo horario de inicio e so depois conferimos o termino.
+        # Segue a hierarquia já validada no script funcional do usuário:
+        # localizar a data, subir até o bloco que contém o botão do intervalo.
+        seletor_botao = f".//button[contains(., '{horario_inicio}')]"
+        seletor_container = f"./ancestor::div[{seletor_botao}][1]"
 
         try:
-            # Segue a hierarquia já validada no script funcional do usuário:
-            # localizar a data, subir até o bloco que contém o botão do intervalo.
             container = dia.find_element(By.XPATH, seletor_container)
             botoes = container.find_elements(By.XPATH, seletor_botao)
         except Exception as exc:
             raise RuntimeError(
-                f"Turno nao localizado para {data_tela}, "
-                f"{horario_inicio}-{horario_fim or '?'}."
+                f"Turno nao localizado para {data_tela} "
+                f"({horario_inicio}-{horario_fim or '?'})."
             ) from exc
 
-        botoes = [
-            b for b in botoes
-            if b.is_displayed() and normalizar(estacao) in self.texto_elemento(b)
-        ]
+        botoes = [b for b in botoes if b.is_displayed()]
 
-        if len(botoes) != 1:
+        do_inicio = [b for b in botoes if self.horarios_do_botao(b)[:1] == [horario_inicio]]
+        candidatos = do_inicio
+        if horario_fim:
+            exatos = [
+                b for b in do_inicio
+                if self.horarios_do_botao(b)[:2] == [horario_inicio, horario_fim]
+            ]
+            candidatos = exatos or do_inicio
+
+        do_hub = [b for b in candidatos if normalizar(estacao) in self.texto_elemento(b)]
+        if do_hub:
+            candidatos = do_hub
+
+        if len(candidatos) != 1:
+            encontrados = [self.texto_elemento(b) for b in botoes]
             raise RuntimeError(
                 f"Turno nao encontrado de forma unica "
-                f"({data_tela} | {horario_inicio}-{horario_fim or '?'} | "
-                f"{estacao}): {len(botoes)} candidatos."
+                f"({data_tela} | {horario_inicio}-{horario_fim or '?'} | {estacao}): "
+                f"{len(candidatos)} candidato(s). Botoes do dia: {encontrados}."
             )
 
-        botao = botoes[0]
+        botao = candidatos[0]
         self.browser.execute_script("arguments[0].scrollIntoView({block:'center'});", botao)
         pausa()
         botao.click()
 
         self.buscar_campo()
+
+    @staticmethod
+    def horarios_do_botao(botao: WebElement) -> List[str]:
+        # Extrai os horarios na ordem em que aparecem no card (ex.: 18:00, 22:00).
+        texto = botao.get_attribute("textContent") or ""
+        return [f"{int(hora):02d}:{minuto}" for hora, minuto in re.findall(r"(\d{1,2}):(\d{2})", texto)]
 
     @staticmethod
     def normalizar_horario(horario: str) -> str:
