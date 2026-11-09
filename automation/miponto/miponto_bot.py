@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import random
 import re
+import tempfile
 import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from selenium import webdriver
@@ -170,42 +172,48 @@ class MiPontoBot:
         estacao: str,
     ) -> None:
         data = datetime.strptime(data_coleta, "%Y-%m-%d")
-        data_tela = data.strftime("%m-%d")
         horario_inicio = self.normalizar_horario(horario_inicio)
         horario_fim = self.normalizar_horario(horario_fim) if horario_fim else None
 
-        dia = self.web_wait.until(
-            EC.presence_of_element_located(
-                (By.XPATH, f"//*[contains(text(), '{data_tela}')]")
+        dia = self.localizar_dia(data)
+        if dia is None:
+            raise RuntimeError(
+                f"Dia {data.strftime('%m-%d')} nao encontrado no calendario do MiPonto "
+                f"(procurei {self.formatos_de_data(data)}). "
+                f"URL: {self.browser.current_url}. Dump: {self.dump_pagina('dia')}."
             )
-        )
+
+        seletor_botao = f".//button[contains(., '{horario_inicio}')]"
 
         # O MiPonto nem sempre exibe o termino que calculamos (inicio + 4h).
         # Por isso localizamos pelo horario de inicio e so depois conferimos o termino.
-        # Segue a hierarquia já validada no script funcional do usuário:
-        # localizar a data, subir até o bloco que contém o botão do intervalo.
-        seletor_botao = f".//button[contains(., '{horario_inicio}')]"
-        seletor_container = f"./ancestor::div[{seletor_botao}][1]"
-
-        try:
-            container = dia.find_element(By.XPATH, seletor_container)
-            botoes = container.find_elements(By.XPATH, seletor_botao)
-        except Exception as exc:
-            raise RuntimeError(
-                f"Turno nao localizado para {data_tela} "
-                f"({horario_inicio}-{horario_fim or '?'})."
-            ) from exc
+        # O texto da data costuma ser apenas o rotulo do dia; o bloco com os botoes
+        # de turno fica logo acima, por isso tentamos tambem o ancestral.
+        botoes = dia.find_elements(By.XPATH, seletor_botao)
+        if not botoes:
+            try:
+                container = dia.find_element(By.XPATH, f"./ancestor::div[{seletor_botao}][1]")
+                botoes = container.find_elements(By.XPATH, seletor_botao)
+            except Exception:
+                botoes = []
 
         botoes = [b for b in botoes if b.is_displayed()]
 
+        if not botoes:
+            raise RuntimeError(
+                f"Nenhum turno com inicio {horario_inicio} no dia {data.strftime('%m-%d')}. "
+                f"URL: {self.browser.current_url}. Botoes do dia: {self.textos_de_botoes()}. "
+                f"Dump: {self.dump_pagina('turno')}."
+            )
+
         do_inicio = [b for b in botoes if self.horarios_do_botao(b)[:1] == [horario_inicio]]
-        candidatos = do_inicio
+        candidatos = do_inicio or botoes
         if horario_fim:
             exatos = [
-                b for b in do_inicio
+                b for b in candidatos
                 if self.horarios_do_botao(b)[:2] == [horario_inicio, horario_fim]
             ]
-            candidatos = exatos or do_inicio
+            candidatos = exatos or candidatos
 
         do_hub = [b for b in candidatos if normalizar(estacao) in self.texto_elemento(b)]
         if do_hub:
@@ -215,8 +223,9 @@ class MiPontoBot:
             encontrados = [self.texto_elemento(b) for b in botoes]
             raise RuntimeError(
                 f"Turno nao encontrado de forma unica "
-                f"({data_tela} | {horario_inicio}-{horario_fim or '?'} | {estacao}): "
-                f"{len(candidatos)} candidato(s). Botoes do dia: {encontrados}."
+                f"({data.strftime('%m-%d')} | {horario_inicio}-{horario_fim or '?'} | {estacao}): "
+                f"{len(candidatos)} candidato(s). Botoes do dia: {encontrados}. "
+                f"Dump: {self.dump_pagina('turno')}."
             )
 
         botao = candidatos[0]
@@ -225,6 +234,49 @@ class MiPontoBot:
         botao.click()
 
         self.buscar_campo()
+
+    @staticmethod
+    def formatos_de_data(data: datetime) -> List[str]:
+        # O calendario do MiPonto pode exibir o dia com separadores diferentes.
+        return [data.strftime(formato) for formato in ("%m-%d", "%m/%d", "%d/%m", "%d-%m")]
+
+    def localizar_dia(self, data: datetime) -> Optional[WebElement]:
+        for formato in self.formatos_de_data(data):
+            elementos = self.browser.find_elements(
+                By.XPATH, f"//*[contains(text(), '{formato}')]"
+            )
+            for elemento in elementos:
+                if not elemento.is_displayed():
+                    continue
+                tem_botoes = elemento.find_elements(By.XPATH, ".//button")
+                tem_ancestral = elemento.find_elements(By.XPATH, "./ancestor::div[.//button][1]")
+                if tem_botoes or tem_ancestral:
+                    return elemento
+            if elementos:
+                return elementos[0]
+        return None
+
+    def textos_de_botoes(self) -> List[str]:
+        # Lista os botoes com horario visiveis na pagina (diagnostico).
+        textos: List[str] = []
+        for botao in self.browser.find_elements(By.XPATH, "//button"):
+            if not botao.is_displayed():
+                continue
+            texto = self.texto_elemento(botao)
+            if ":" in texto:
+                textos.append(texto)
+            if len(textos) >= 20:
+                break
+        return textos
+
+    def dump_pagina(self, nome: str) -> str:
+        # Salva o HTML atual para investigar falhas de localizacao.
+        caminho = Path(tempfile.gettempdir()) / f"miponto_{nome}_{int(time.time())}.html"
+        try:
+            caminho.write_text(self.browser.page_source, encoding="utf-8")
+            return str(caminho)
+        except Exception:
+            return "indisponivel"
 
     @staticmethod
     def horarios_do_botao(botao: WebElement) -> List[str]:
