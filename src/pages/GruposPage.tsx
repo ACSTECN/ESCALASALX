@@ -72,6 +72,8 @@ export function GruposPage() {
   } | null>(null);
   const [buscaRegistrado, setBuscaRegistrado] = useState('');
   const [buscaVinculado, setBuscaVinculado] = useState('');
+  const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
+  const [removendoTodos, setRemovendoTodos] = useState(false);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
 
   const toggleExpandido = (grupoId: string) => {
@@ -215,6 +217,16 @@ export function GruposPage() {
     if (!gerirGrupo) return;
     await dbGrupos.removeCondutor(gerirGrupo.id, condutorId);
     setVinculados((prev) => prev.filter((v) => v.condutor_id !== condutorId));
+    loadData();
+  };
+
+  const removerTodosVinculos = async () => {
+    if (!gerirGrupo) return;
+    setRemovendoTodos(true);
+    await dbGrupos.removeAllCondutores(gerirGrupo.id);
+    setVinculados([]);
+    setRemovendoTodos(false);
+    setConfirmRemoveAll(false);
     loadData();
   };
 
@@ -531,18 +543,29 @@ export function GruposPage() {
             </div>
 
             <div className="border-t border-slate-200 pt-4">
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Vinculados ({vinculados.length})
                 </div>
-                <div className="relative w-56">
-                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    className="input py-1.5 pl-8 text-xs"
-                    placeholder="Buscar vinculado..."
-                    value={buscaVinculado}
-                    onChange={(e) => setBuscaVinculado(e.target.value)}
-                  />
+                <div className="flex items-center gap-2">
+                  {canEdit && vinculados.length > 0 && (
+                    <button
+                      className="btn-secondary !py-1 !px-2 text-xs inline-flex items-center gap-1 whitespace-nowrap"
+                      onClick={() => setConfirmRemoveAll(true)}
+                      title="Remover todos os entregadores deste grupo"
+                    >
+                      <Trash2 size={12} /> Remover todos
+                    </button>
+                  )}
+                  <div className="relative w-56">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      className="input py-1.5 pl-8 text-xs"
+                      placeholder="Buscar vinculado..."
+                      value={buscaVinculado}
+                      onChange={(e) => setBuscaVinculado(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -585,6 +608,16 @@ export function GruposPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={confirmRemoveAll}
+        onClose={() => setConfirmRemoveAll(false)}
+        onConfirm={removerTodosVinculos}
+        title="Remover todos do grupo"
+        message={`Cuidado: remover todos os ${vinculados.length} entregador(es) vinculado(s) ao grupo ${gerirGrupo?.nome || ''}? Os entregadores continuam cadastrados; apenas deixam de estar neste grupo.`}
+        confirmLabel="Remover todos"
+        loading={removendoTodos}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}
