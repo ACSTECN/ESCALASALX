@@ -9,8 +9,7 @@ Servico local para o frontend chamar um Selenium do Edge e registrar a escala do
 - entra em Central de Despacho
 - procura o card do dia + horario (inicio e fim) + estacao
 - pesquisa cada motorista por CPF ou nome
-- marca a pessoa na lista lateral
-- clica no botao final de envio quando `MIPONTO_CONFIRM_SUBMIT=true`
+- marca e envia **um por vez**, repetindo ate acabar, quando `MIPONTO_CONFIRM_SUBMIT=true`
 
 ## Arquivos
 

@@ -408,29 +408,11 @@ class MiPontoBot:
 
         resultados: List[DispatchResultado] = []
         selecionados = 0
+        enviados = 0
 
         for motorista in payload.motoristas:
             try:
                 status, detalhe = self.marcar_condutor(motorista.nome, motorista.cpf)
-                if status in ("MARCADO", "JA_MARCADO"):
-                    selecionados += 1
-                    resultados.append(
-                        DispatchResultado(
-                            nome=motorista.nome,
-                            cpf=motorista.cpf,
-                            status="selecionado",
-                            detalhe=detalhe,
-                        )
-                    )
-                else:
-                    resultados.append(
-                        DispatchResultado(
-                            nome=motorista.nome,
-                            cpf=motorista.cpf,
-                            status="ignorado",
-                            detalhe=detalhe,
-                        )
-                    )
             except Exception as exc:
                 resultados.append(
                     DispatchResultado(
@@ -440,29 +422,68 @@ class MiPontoBot:
                         detalhe=str(exc),
                     )
                 )
+                continue
 
-        # Limpar o campo de busca sem desmarcar os condutores.
-        try:
-            self.buscar_campo().clear()
-            pausa(1.0, 1.5)
-        except Exception:
-            pass
+            if status not in ("MARCADO", "JA_MARCADO"):
+                resultados.append(
+                    DispatchResultado(
+                        nome=motorista.nome,
+                        cpf=motorista.cpf,
+                        status="ignorado",
+                        detalhe=detalhe,
+                    )
+                )
+                continue
 
-        submit_realizado = False
-        if selecionados > 0 and self.settings.confirm_submit:
-            submit_realizado = self.enviar(selecionados)
+            selecionados += 1
 
-        mensagem = f"{selecionados} condutor(es) selecionado(s) no MePonto."
+            if not self.settings.confirm_submit:
+                resultados.append(
+                    DispatchResultado(
+                        nome=motorista.nome,
+                        cpf=motorista.cpf,
+                        status="selecionado",
+                        detalhe=f"{detalhe} Envio final desligado no servico local (modo teste).",
+                    )
+                )
+                continue
+
+            # Um por vez: marca o condutor e envia antes de seguir para o proximo.
+            try:
+                self.enviar(1)
+                enviados += 1
+                resultados.append(
+                    DispatchResultado(
+                        nome=motorista.nome,
+                        cpf=motorista.cpf,
+                        status="selecionado",
+                        detalhe="Enviado ao MePonto.",
+                    )
+                )
+            except Exception as exc:
+                resultados.append(
+                    DispatchResultado(
+                        nome=motorista.nome,
+                        cpf=motorista.cpf,
+                        status="erro",
+                        detalhe=f"Selecionado, mas falhou o envio: {exc}",
+                    )
+                )
+
+        mensagem = f"{enviados} condutor(es) enviado(s) um a um no MePonto."
         if selecionados == 0:
             mensagem = "Nenhum condutor foi selecionado no MePonto."
-        if not self.settings.confirm_submit:
-            mensagem += " Envio final desligado no servico local (modo teste)."
+        elif not self.settings.confirm_submit:
+            mensagem = (
+                f"{selecionados} condutor(es) selecionado(s) no MePonto. "
+                "Envio final desligado no servico local (modo teste)."
+            )
 
         return DispatchResponse(
             ok=True,
             message=mensagem,
             processed=len(payload.motoristas),
             selected=selecionados,
-            submit_performed=submit_realizado,
+            submit_performed=enviados > 0,
             resultados=resultados,
         )
